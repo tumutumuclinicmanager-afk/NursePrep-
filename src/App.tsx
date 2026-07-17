@@ -9,7 +9,6 @@ import { PublicLayout } from './layouts/PublicLayout';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import Home from './pages/Home';
 import StudentDashboard from './pages/StudentDashboard';
-import StaffDashboard from './pages/StaffDashboard';
 import ExamBank from './pages/ExamBank';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -18,6 +17,8 @@ import UserManagement from './pages/admin/UserManagement';
 import Payments from './pages/admin/Payments';
 import Analytics from './pages/admin/Analytics';
 import UploadExams from './pages/staff/UploadExams';
+import LiveSessions from './pages/staff/LiveSessions';
+import StudentQueries from './pages/staff/StudentQueries';
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -58,10 +59,10 @@ export default function App() {
         </Route>
 
         <Route path="/staff" element={<DashboardLayout userRole="staff" />}>
-          <Route index element={<Navigate to="/staff/mixer" replace />} />
-          <Route path="mixer" element={<StaffDashboard />} />
+          <Route index element={<Navigate to="/staff/upload" replace />} />
           <Route path="upload" element={<UploadExams />} />
-          <Route path="courses" element={<PlaceholderPage title="My Courses (Staff)" />} />
+          <Route path="sessions" element={<LiveSessions />} />
+          <Route path="queries" element={<StudentQueries />} />
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
         </Route>
         

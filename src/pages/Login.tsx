@@ -8,17 +8,32 @@ export default function Login() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
 
-  const handleStudentLogin = (e: React.FormEvent) => {
+  const [email, setEmail] = useState('');
+  
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('userRole', 'student');
-    navigate('/dashboard');
+    if (email.endsWith('@nurseprep.ai')) {
+      localStorage.setItem('userRole', 'staff');
+      navigate('/staff');
+    } else if (email === 'admin@nurseprep.ai' || email === 'wangechigodfrey77@gmail.com') {
+      localStorage.setItem('userRole', 'admin');
+      navigate('/admin');
+    } else {
+      localStorage.setItem('userRole', 'student');
+      navigate('/dashboard');
+    }
   };
 
   const handleGoogleSignIn = async () => {
     try {
       setError('');
       const result = await signInWithPopup(auth, googleProvider);
-      if (result.user.email === 'wangechigodfrey77@gmail.com') {
+      const userEmail = result.user.email || '';
+      
+      if (userEmail.endsWith('@nurseprep.ai')) {
+        localStorage.setItem('userRole', 'staff');
+        navigate('/staff');
+      } else if (userEmail === 'wangechigodfrey77@gmail.com') {
         localStorage.setItem('userRole', 'admin');
         navigate('/admin');
       } else {
@@ -47,12 +62,14 @@ export default function Login() {
               {error}
             </div>
           )}
-          <form onSubmit={handleStudentLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Email Address</label>
               <input 
                 type="email" 
                 placeholder="jane@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
                 required
               />
@@ -71,7 +88,7 @@ export default function Login() {
             </div>
             
             <Button type="submit" className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider text-sm mt-2 shadow-md shadow-blue-200">
-              Sign In (Student)
+              Sign In
             </Button>
           </form>
 
@@ -88,7 +105,7 @@ export default function Login() {
             onClick={handleGoogleSignIn}
           >
             <Chrome className="w-5 h-5 text-blue-500" />
-            Sign in with Google (Admin)
+            Sign in with Google
           </Button>
 
           <p className="text-center text-sm text-slate-500 mt-8">

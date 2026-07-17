@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, FileText, Bell, LogOut, ChevronRight, Menu, X } from 'lucide-react';
+import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, FileText, Bell, LogOut, ChevronRight, Menu, X, Video, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 
@@ -25,8 +25,8 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
       return [
         { name: 'Dashboard', icon: LayoutDashboard, path: '/staff' },
         { name: 'Upload Exams', icon: FileText, path: '/staff/upload' },
-        { name: 'AI Mixer', icon: Brain, path: '/staff/mixer' },
-        { name: 'My Courses', icon: BookOpen, path: '/staff/courses' },
+        { name: 'Live Sessions', icon: Video, path: '/staff/sessions' },
+        { name: 'Student Queries', icon: MessageSquare, path: '/staff/queries' },
       ];
     }
     return [
