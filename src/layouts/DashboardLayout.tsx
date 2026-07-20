@@ -32,6 +32,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
     return [
       { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
       { name: 'My Courses', icon: BookOpen, path: '/dashboard/courses' },
+      { name: 'Exam Bank', icon: BookOpen, path: '/exams' },
       { name: 'AI Exam Generator', icon: Brain, path: '/dashboard/generator' },
       { name: 'Performance', icon: FileText, path: '/dashboard/performance' },
     ];

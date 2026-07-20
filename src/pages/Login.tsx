@@ -2,25 +2,38 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Stethoscope, Chrome } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { auth, googleProvider, signInWithPopup } from '@/lib/firebase';
+import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword } from '@/lib/firebase';
 
 export default function Login() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
 
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.endsWith('@nurseprep.ai')) {
-      localStorage.setItem('userRole', 'staff');
-      navigate('/staff');
-    } else if (email === 'admin@nurseprep.ai' || email === 'wangechigodfrey77@gmail.com') {
-      localStorage.setItem('userRole', 'admin');
-      navigate('/admin');
-    } else {
-      localStorage.setItem('userRole', 'student');
-      navigate('/dashboard');
+    try {
+      setLoading(true);
+      setError('');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userEmail = userCredential.user.email || '';
+      
+      if (userEmail.endsWith('@nurseprep.ai')) {
+        localStorage.setItem('userRole', 'staff');
+        navigate('/staff');
+      } else if (userEmail === 'admin@nurseprep.ai' || userEmail === 'wangechigodfrey77@gmail.com') {
+        localStorage.setItem('userRole', 'admin');
+        navigate('/admin');
+      } else {
+        localStorage.setItem('userRole', 'student');
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign in');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -82,13 +95,15 @@ export default function Login() {
               <input 
                 type="password" 
                 placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
                 required
               />
             </div>
             
-            <Button type="submit" className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider text-sm mt-2 shadow-md shadow-blue-200">
-              Sign In
+            <Button type="submit" disabled={loading} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wider text-sm mt-2 shadow-md shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed">
+              {loading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
 

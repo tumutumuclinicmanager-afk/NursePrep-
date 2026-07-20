@@ -20,6 +20,8 @@ import UploadExams from './pages/staff/UploadExams';
 import LiveSessions from './pages/staff/LiveSessions';
 import StudentQueries from './pages/staff/StudentQueries';
 
+import Pricing from './pages/Pricing';
+
 function PlaceholderPage({ title }: { title: string }) {
   return (
     <div className="p-12 text-center text-xl text-slate-500 font-serif border-2 border-dashed border-slate-200 rounded-2xl m-4">
@@ -44,7 +46,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/courses" element={<PlaceholderPage title="Courses" />} />
           <Route path="/exams" element={<ProtectedRoute><ExamBank /></ProtectedRoute>} />
-          <Route path="/pricing" element={<PlaceholderPage title="Pricing" />} />
+          <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<PlaceholderPage title="About Us" />} />
           <Route path="/contact" element={<PlaceholderPage title="Contact" />} />
           <Route path="/login" element={<Login />} />

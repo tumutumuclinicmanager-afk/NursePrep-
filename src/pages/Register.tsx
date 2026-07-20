@@ -1,14 +1,43 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Stethoscope } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { auth, createUserWithEmailAndPassword, updateProfile } from '@/lib/firebase';
 
 export default function Register() {
   const navigate = useNavigate();
 
-  const handleRegister = (e: React.FormEvent) => {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [exam, setExam] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/dashboard');
+    try {
+      setLoading(true);
+      setError('');
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(userCredential.user, { displayName: name });
+      
+      const userEmail = email;
+      if (userEmail.endsWith('@nurseprep.ai')) {
+        localStorage.setItem('userRole', 'staff');
+        navigate('/staff');
+      } else if (userEmail === 'admin@nurseprep.ai' || userEmail === 'wangechigodfrey77@gmail.com') {
+        localStorage.setItem('userRole', 'admin');
+        navigate('/admin');
+      } else {
+        localStorage.setItem('userRole', 'student');
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to register');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -23,12 +52,19 @@ export default function Register() {
         </div>
 
         <div className="p-8">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Full Name</label>
               <input 
                 type="text" 
                 placeholder="Jane Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm"
                 required
               />
@@ -38,13 +74,19 @@ export default function Register() {
               <input 
                 type="email" 
                 placeholder="jane@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm"
                 required
               />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Target Exam</label>
-              <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm appearance-none">
+              <select 
+                value={exam}
+                onChange={(e) => setExam(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm appearance-none"
+              >
                 <option value="">Select an exam</option>
                 <option value="nclex-rn">NCLEX-RN</option>
                 <option value="nclex-pn">NCLEX-PN</option>
@@ -57,13 +99,15 @@ export default function Register() {
               <input 
                 type="password" 
                 placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm"
                 required
               />
             </div>
             
-            <Button type="submit" className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase tracking-wider text-sm mt-4 shadow-md shadow-emerald-200">
-              Create Account
+            <Button type="submit" disabled={loading} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase tracking-wider text-sm mt-4 shadow-md shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed">
+              {loading ? 'Creating...' : 'Create Account'}
             </Button>
           </form>
 

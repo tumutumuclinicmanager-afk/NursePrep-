@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    match /payments/{paymentId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /exams/{examId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /examHistory/{historyId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Fallback rule for other collections during development
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

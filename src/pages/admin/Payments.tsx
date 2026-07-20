@@ -1,24 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DollarSign, Search, CheckCircle, Send, XCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { collection, query, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function Payments() {
-  const [payments, setPayments] = useState([
-    { id: 'PAY-1002', user: 'jane.student@example.com', name: 'Jane Doe', amount: 'Ksh 2,500', plan: 'Gold Plan', mpesaRef: 'SAX8921JHK', status: 'Pending', date: '2023-11-10 14:20' },
-    { id: 'PAY-1001', user: 'mark.t@example.com', name: 'Mark Taylor', amount: 'Ksh 1,500', plan: 'Pro Plan', mpesaRef: 'SAW7812KLM', status: 'Approved', date: '2023-11-09 09:15' }
-  ]);
+  const [payments, setPayments] = useState<any[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'payments'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data: any[] = [];
+      snapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() });
+      });
+      setPayments(data);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
 
-  const handleApprove = (payment: any) => {
-    setPayments(payments.map(p => p.id === payment.id ? { ...p, status: 'Approved' } : p));
-    setSelectedPayment(null);
-    alert(`Access code sent to ${payment.user}`);
+  const handleApprove = async (payment: any) => {
+    try {
+      await updateDoc(doc(db, 'payments', payment.id), { status: 'Approved' });
+      setSelectedPayment(null);
+      alert(`Access code sent to ${payment.user}`);
+    } catch (error) {
+      console.error("Error approving payment:", error);
+      alert("Failed to update payment status");
+    }
   };
 
-  const handleReject = (payment: any) => {
-    setPayments(payments.map(p => p.id === payment.id ? { ...p, status: 'Rejected' } : p));
-    setSelectedPayment(null);
+  const handleReject = async (payment: any) => {
+    try {
+      await updateDoc(doc(db, 'payments', payment.id), { status: 'Rejected' });
+      setSelectedPayment(null);
+    } catch (error) {
+      console.error("Error rejecting payment:", error);
+      alert("Failed to update payment status");
+    }
   };
 
   return (

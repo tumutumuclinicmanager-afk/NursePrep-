@@ -1,17 +1,53 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { BookOpen, CheckCircle, Clock, TrendingUp, BrainCircuit, Activity, Target, Flame, Medal, Award, Star } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
 
 export default function StudentDashboard() {
+  const [stats, setStats] = useState({
+    questionsAnswered: 0,
+    averageScore: 0,
+    streak: 0,
+    xp: 0
+  });
+  const [history, setHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!auth.currentUser) return;
+      try {
+        const historyRef = collection(db, 'examHistory');
+        const q = query(historyRef, where('user', '==', auth.currentUser.email));
+        const querySnapshot = await getDocs(q);
+        
+        const data = querySnapshot.docs.map(doc => doc.data());
+        setHistory(data);
+        
+        if (data.length > 0) {
+          setStats({
+            questionsAnswered: data.reduce((acc, curr) => acc + (curr.totalQuestions || 0), 0),
+            averageScore: Math.round(data.reduce((acc, curr) => acc + (curr.score || 0), 0) / data.length),
+            streak: 1, 
+            xp: data.length * 50 
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching user data", error);
+      }
+    };
+    fetchUserData();
+  }, []);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
       {/* Top Stats Row */}
       {[
-        { title: 'Questions Answered', value: '1,248', icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { title: 'Average Score', value: '84.2%', icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { title: 'Study Streak', value: '14 Days', icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50' },
-        { title: 'Total XP', value: '2,450', icon: Star, color: 'text-purple-600', bg: 'bg-purple-50' }
+        { title: 'Questions Answered', value: stats.questionsAnswered.toString(), icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { title: 'Average Score', value: `${stats.averageScore}%`, icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { title: 'Study Streak', value: `${stats.streak} Days`, icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50' },
+        { title: 'Total XP', value: stats.xp.toString(), icon: Star, color: 'text-purple-600', bg: 'bg-purple-50' }
       ].map((stat, i) => (
         <div key={i} className="col-span-1 md:col-span-6 lg:col-span-3 bg-white p-4 rounded-xl border border-slate-200 flex items-center gap-4">
           <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
@@ -119,36 +155,39 @@ export default function StudentDashboard() {
             <a href="#" className="text-xs text-blue-600 font-bold uppercase tracking-tight">View All</a>
           </div>
           <div className="p-0 overflow-x-auto">
-            <table className="w-full text-left min-w-[500px]">
-              <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                <tr>
-                  <th className="px-6 py-3">Exam Title</th>
-                  <th className="px-6 py-3">Category</th>
-                  <th className="px-6 py-3">Score</th>
-                  <th className="px-6 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm">
-                <tr className="border-b border-slate-50 hover:bg-slate-50/50">
-                  <td className="px-6 py-4 font-medium text-slate-700">Pharmacology Mock #4</td>
-                  <td className="px-6 py-4 text-slate-500">NCLEX-RN</td>
-                  <td className="px-6 py-4 font-bold text-emerald-600">88%</td>
-                  <td className="px-6 py-4"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-bold">Passed</span></td>
-                </tr>
-                <tr className="border-b border-slate-50 hover:bg-slate-50/50">
-                  <td className="px-6 py-4 font-medium text-slate-700">Pediatrics Comprehensive</td>
-                  <td className="px-6 py-4 text-slate-500">HESI A2</td>
-                  <td className="px-6 py-4 font-bold text-blue-600">76%</td>
-                  <td className="px-6 py-4"><span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">Review</span></td>
-                </tr>
-                <tr className="border-b border-slate-50 hover:bg-slate-50/50">
-                  <td className="px-6 py-4 font-medium text-slate-700">Medical-Surgical Quiz</td>
-                  <td className="px-6 py-4 text-slate-500">TEAS 7</td>
-                  <td className="px-6 py-4 font-bold text-orange-600">68%</td>
-                  <td className="px-6 py-4"><span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-bold">Failed</span></td>
-                </tr>
-              </tbody>
-            </table>
+            {history.length > 0 ? (
+              <table className="w-full text-left min-w-[500px]">
+                <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  <tr>
+                    <th className="px-6 py-3">Exam Title</th>
+                    <th className="px-6 py-3">Category</th>
+                    <th className="px-6 py-3">Score</th>
+                    <th className="px-6 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {history.map((exam, i) => (
+                    <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50">
+                      <td className="px-6 py-4 font-medium text-slate-700">{exam.title || 'Untitled Exam'}</td>
+                      <td className="px-6 py-4 text-slate-500">{exam.category || 'General'}</td>
+                      <td className="px-6 py-4 font-bold text-emerald-600">{exam.score || 0}%</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          (exam.score || 0) >= 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {(exam.score || 0) >= 80 ? 'Passed' : 'Needs Review'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-8 text-center text-slate-500">
+                <BookOpen className="w-12 h-12 mx-auto text-slate-300 mb-4" />
+                <p>No exams taken yet. Start practicing to see your history here.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -162,16 +201,16 @@ export default function StudentDashboard() {
               <Flame className="w-5 h-5" />
               Daily Goal
             </h3>
-            <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded">14 Day Streak!</span>
+            <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded">{stats.streak} Day Streak!</span>
           </div>
           <div className="mb-2 flex justify-between text-sm font-medium">
             <span>Progress (XP)</span>
-            <span>150 / 200 XP</span>
+            <span>{stats.xp} / {(Math.floor(stats.xp / 200) + 1) * 200} XP</span>
           </div>
           <div className="w-full bg-black/20 rounded-full h-2.5 overflow-hidden">
-            <div className="bg-white h-2.5 rounded-full" style={{ width: '75%' }}></div>
+            <div className="bg-white h-2.5 rounded-full" style={{ width: `${(stats.xp % 200) / 200 * 100}%` }}></div>
           </div>
-          <p className="text-xs mt-3 opacity-90 text-center">Complete one more quiz to hit your daily goal!</p>
+          <p className="text-xs mt-3 opacity-90 text-center">Keep practicing to hit your daily goal!</p>
         </div>
 
         {/* Custom Quiz Generator */}
