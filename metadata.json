@@ -1,5 +1,5 @@
 {
-  "name": "Nurse Prep",
+  "name": "NursePrep",
   "description": "A modern web application that helps nursing students prepare for professional licensing examinations.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
