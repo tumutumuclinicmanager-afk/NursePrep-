@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Stethoscope } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { auth, createUserWithEmailAndPassword, updateProfile } from '@/lib/firebase';
+import { auth, db, createUserWithEmailAndPassword, updateProfile } from '@/lib/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -19,18 +20,38 @@ export default function Register() {
     try {
       setLoading(true);
       setError('');
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await updateProfile(userCredential.user, { displayName: name });
       
-      const userEmail = email;
-      if (userEmail.endsWith('@nurseprep.ai')) {
-        localStorage.setItem('userRole', 'staff');
-        navigate('/staff');
-      } else if (userEmail === 'admin@nurseprep.ai' || userEmail === 'wangechigodfrey77@gmail.com') {
-        localStorage.setItem('userRole', 'admin');
+      const userEmail = email.trim().toLowerCase();
+      let role = 'Student';
+      let userRole = 'student';
+      
+      if (userEmail === 'admin@nurseprep.ai' || userEmail === 'wangechigodfrey77@gmail.com') {
+        role = 'Admin';
+        userRole = 'admin';
+      } else if (userEmail.endsWith('@nurseprep.ai')) {
+        role = 'Staff / Lecturer';
+        userRole = 'staff';
+      }
+      
+      // Save profile to Firestore
+      await addDoc(collection(db, 'users'), {
+        name,
+        email: userEmail,
+        password: password, // Store temporary/initial password for lookup
+        role: role,
+        status: 'Active',
+        added: new Date().toISOString().split('T')[0],
+        targetExam: exam
+      });
+      
+      localStorage.setItem('userRole', userRole);
+      if (userRole === 'admin') {
         navigate('/admin');
+      } else if (userRole === 'staff') {
+        navigate('/staff');
       } else {
-        localStorage.setItem('userRole', 'student');
         navigate('/dashboard');
       }
     } catch (err: any) {

@@ -70,6 +70,8 @@ export default function App() {
         
         <Route path="/admin" element={<DashboardLayout userRole="admin" />}>
           <Route index element={<AdminOverview />} />
+          <Route path="questions" element={<UploadExams />} />
+          <Route path="upload" element={<UploadExams />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="payments" element={<Payments />} />
           <Route path="analytics" element={<Analytics />} />

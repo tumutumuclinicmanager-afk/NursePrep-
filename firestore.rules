@@ -6,6 +6,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /users {
+      allow read: if true;
+      allow write: if true;
+    }
+
     match /payments/{paymentId} {
       allow read, write: if isAuthenticated();
     }

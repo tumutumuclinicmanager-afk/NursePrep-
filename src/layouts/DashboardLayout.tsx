@@ -1,21 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, FileText, Bell, LogOut, ChevronRight, Menu, X, Video, MessageSquare } from 'lucide-react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, FileText, Bell, LogOut, ChevronRight, Menu, X, Video, MessageSquare, Edit3, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
+import { auth, signOut } from '@/lib/firebase';
 
 export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student' | 'staff' | 'admin' }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.warn("Sign out warning:", e);
+    }
+    localStorage.removeItem('userRole');
+    navigate('/login');
+  };
+
   const getNavItems = () => {
     if (userRole === 'admin') {
       return [
         { name: 'Overview', icon: LayoutDashboard, path: '/admin' },
+        { name: 'Question Bank & Creator', icon: Edit3, path: '/admin/questions' },
         { name: 'User Management', icon: GraduationCap, path: '/admin/users' },
         { name: 'Payments', icon: FileText, path: '/admin/payments' },
         { name: 'Analytics', icon: Brain, path: '/admin/analytics' },
@@ -96,12 +109,10 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
         )}
         
         <div className="p-4 border-t border-slate-100 shrink-0 mt-auto">
-          <Link to="/" onClick={() => localStorage.removeItem('userRole')} className="block">
-            <Button variant="ghost" className="w-full justify-start gap-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50">
-              <LogOut className="w-4 h-4" />
-              Sign Out
-            </Button>
-          </Link>
+          <Button onClick={handleSignOut} variant="ghost" className="w-full justify-start gap-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50">
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </Button>
         </div>
       </aside>
 

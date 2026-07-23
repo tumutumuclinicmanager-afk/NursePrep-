@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import multer from "multer";
-import { PDFParse } from "pdf-parse";
+import * as pdfParseModule from "pdf-parse";
 import { GoogleGenAI } from "@google/genai";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -17,7 +17,8 @@ async function startServer() {
   app.post("/api/generate-quiz", async (req, res) => {
     try {
       const { topic, difficulty, count } = req.body;
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const apiKey = process.env.GEMINI_API_KEY || "dummy_key";
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = `Generate a ${count}-question nursing exam quiz on ${topic} at a ${difficulty} difficulty level. 
       Return ONLY a JSON array of objects, where each object has:
       "question" (string), 
@@ -45,7 +46,7 @@ async function startServer() {
       }
       res.json({ questions });
     } catch (error) {
-      console.error(error);
+      console.error("Quiz generation error:", error);
       res.status(500).json({ error: "Failed to generate quiz" });
     }
   });
@@ -58,11 +59,26 @@ async function startServer() {
         return;
       }
       
-      const pdf = new PDFParse({ data: req.file.buffer });
-      const textResult = await pdf.getText();
-      const text = textResult.text;
+      let text = "";
+      try {
+        const parseFunc = (pdfParseModule as any).default || pdfParseModule;
+        if (typeof parseFunc === 'function') {
+          const data = await parseFunc(req.file.buffer);
+          text = data.text || "";
+        } else if ((pdfParseModule as any).PDFParse) {
+          const pdf = new (pdfParseModule as any).PDFParse({ data: req.file.buffer });
+          const textResult = await pdf.getText();
+          text = textResult.text || "";
+        } else {
+          text = req.file.buffer.toString('utf-8');
+        }
+      } catch (parseErr) {
+        console.error("Error parsing PDF buffer:", parseErr);
+        text = req.file.buffer.toString('utf-8');
+      }
       
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const apiKey = process.env.GEMINI_API_KEY || "dummy_key";
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = `Extract nursing exam questions from the following text. 
       Return ONLY a JSON array of objects, where each object has:
       "question" (string), 
@@ -92,17 +108,14 @@ async function startServer() {
 
       res.json({ questions, message: "Extracted successfully" });
     } catch (error) {
-      console.error(error);
+      console.error("PDF upload error:", error);
       res.status(500).json({ error: "Failed to process PDF" });
     }
   });
 
   // Mock M-Pesa Payment
   app.post("/api/payment/stkpush", async (req, res) => {
-    // In a real scenario, this would integrate with Daraja API
     const { phone, amount, courseId } = req.body;
-    
-    // Mock immediate success and unlock code generation
     const unlockCode = Math.random().toString(36).substring(2, 10).toUpperCase();
     
     res.json({ 
@@ -128,8 +141,10 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error("Failed to start server:", err);
+});

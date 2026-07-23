@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Stethoscope, Chrome } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword } from '@/lib/firebase';
+import { auth, db, googleProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from '@/lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -17,17 +18,89 @@ export default function Login() {
     try {
       setLoading(true);
       setError('');
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userEmail = userCredential.user.email || '';
       
-      if (userEmail.endsWith('@nurseprep.ai')) {
-        localStorage.setItem('userRole', 'staff');
-        navigate('/staff');
-      } else if (userEmail === 'admin@nurseprep.ai' || userEmail === 'wangechigodfrey77@gmail.com') {
-        localStorage.setItem('userRole', 'admin');
-        navigate('/admin');
+      // Look up user role and credentials in Firestore 'users' collection & localStorage backup
+      const normalizedEmail = email.trim().toLowerCase();
+      let userDoc: any = null;
+
+      try {
+        const q = query(collection(db, 'users'), where('email', '==', normalizedEmail));
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.size > 0) {
+          userDoc = querySnapshot.docs[0].data();
+        }
+      } catch (e) {
+        console.warn("Firestore lookup failed, checking local backup:", e);
+      }
+
+      // If not found in Firestore, check localStorage custom users
+      if (!userDoc) {
+        const localUsers = JSON.parse(localStorage.getItem('nurseprep_custom_users') || '[]');
+        userDoc = localUsers.find((u: any) => u.email?.toLowerCase() === normalizedEmail);
+      }
+
+      let userRole = 'student';
+      let dbPassword = '';
+      let isDbUser = false;
+      let dbName = '';
+      
+      if (userDoc) {
+        dbPassword = userDoc.password || '';
+        dbName = userDoc.name || '';
+        isDbUser = true;
+        
+        const role = userDoc.role || 'Student';
+        if (role.toLowerCase().includes('admin')) {
+          userRole = 'admin';
+        } else if (role.toLowerCase().includes('staff') || role.toLowerCase().includes('lecturer')) {
+          userRole = 'staff';
+        } else {
+          userRole = 'student';
+        }
       } else {
-        localStorage.setItem('userRole', 'student');
+        // Fallback for hardcoded emails or direct domain matches
+        if (normalizedEmail === 'admin@nurseprep.ai' || normalizedEmail === 'wangechigodfrey77@gmail.com') {
+          userRole = 'admin';
+        } else if (normalizedEmail.endsWith('@nurseprep.ai')) {
+          userRole = 'staff';
+        } else {
+          userRole = 'student';
+        }
+      }
+      
+      // If user is from the database and we have a temporary password set
+      if (isDbUser && dbPassword) {
+        if (password !== dbPassword) {
+          throw new Error('Invalid email or password.');
+        }
+      }
+      
+      // Perform Auth Sign In
+      try {
+        await signInWithEmailAndPassword(auth, email.trim(), password);
+      } catch (authErr: any) {
+        // If user is registered in the DB (like lecturer/admin created by Super Admin) but not yet in Auth, create them now
+        if (isDbUser && (authErr.code === 'auth/user-not-found' || authErr.message?.includes('user-not-found') || authErr.code === 'auth/invalid-credential')) {
+          try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+            if (userCredential.user) {
+              await updateProfile(userCredential.user, { displayName: dbName });
+            }
+          } catch (createErr: any) {
+            console.error('Failed to auto-register db user in Auth:', createErr);
+            throw authErr; // throw original login error if fallback registration fails
+          }
+        } else {
+          throw authErr;
+        }
+      }
+      
+      localStorage.setItem('userRole', userRole);
+      if (userRole === 'admin') {
+        navigate('/admin');
+      } else if (userRole === 'staff') {
+        navigate('/staff');
+      } else {
         navigate('/dashboard');
       }
     } catch (err: any) {
@@ -41,16 +114,39 @@ export default function Login() {
     try {
       setError('');
       const result = await signInWithPopup(auth, googleProvider);
-      const userEmail = result.user.email || '';
+      const userEmail = (result.user.email || '').trim().toLowerCase();
       
-      if (userEmail.endsWith('@nurseprep.ai')) {
-        localStorage.setItem('userRole', 'staff');
-        navigate('/staff');
-      } else if (userEmail === 'wangechigodfrey77@gmail.com') {
-        localStorage.setItem('userRole', 'admin');
-        navigate('/admin');
+      // Look up user role in Firestore 'users' collection
+      const q = query(collection(db, 'users'), where('email', '==', userEmail));
+      const querySnapshot = await getDocs(q);
+      
+      let userRole = 'student';
+      if (querySnapshot.size > 0) {
+        const userDoc = querySnapshot.docs[0].data();
+        const role = userDoc.role || 'Student';
+        if (role.toLowerCase().includes('admin')) {
+          userRole = 'admin';
+        } else if (role.toLowerCase().includes('staff') || role.toLowerCase().includes('lecturer')) {
+          userRole = 'staff';
+        } else {
+          userRole = 'student';
+        }
       } else {
-        localStorage.setItem('userRole', 'student');
+        if (userEmail === 'admin@nurseprep.ai' || userEmail === 'wangechigodfrey77@gmail.com') {
+          userRole = 'admin';
+        } else if (userEmail.endsWith('@nurseprep.ai')) {
+          userRole = 'staff';
+        } else {
+          userRole = 'student';
+        }
+      }
+      
+      localStorage.setItem('userRole', userRole);
+      if (userRole === 'admin') {
+        navigate('/admin');
+      } else if (userRole === 'staff') {
+        navigate('/staff');
+      } else {
         navigate('/dashboard');
       }
     } catch (err: any) {

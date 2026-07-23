@@ -1,44 +1,114 @@
-import React, { useState } from 'react';
-import { UserPlus, Search, MoreVertical, Shield, GraduationCap, Users } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserPlus, Search, MoreVertical, Shield, GraduationCap, Users, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { collection, addDoc, getDocs, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function UserManagement() {
   const [activeTab, setActiveTab] = useState('lecturers');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  const [lecturers, setLecturers] = useState([
-    { id: 'L-01', name: 'Dr. Emily Chen', email: 'echen@nurseprep.ai', role: 'Staff / Lecturer', status: 'Active', added: '2023-10-12' },
-    { id: 'L-02', name: 'Prof. James Wilson', email: 'jwilson@nurseprep.ai', role: 'Staff / Lecturer', status: 'Active', added: '2023-11-05' }
-  ]);
-
-  const [admins, setAdmins] = useState([
-    { id: 'A-01', name: 'Godfrey Wangechi', email: 'wangechigodfrey77@gmail.com', role: 'Super Admin', status: 'Active', added: '2023-01-01' },
-    { id: 'A-02', name: 'System Admin', email: 'admin@nurseprep.ai', role: 'Admin', status: 'Active', added: '2023-01-01' }
-  ]);
-
   const [formData, setFormData] = useState({ name: '', email: '', password: '', role: '' });
 
-  const handleCreateUser = () => {
-    if (!formData.name || !formData.email) return;
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        let userList: any[] = [];
+        try {
+          const q = query(collection(db, 'users'));
+          const querySnapshot = await getDocs(q);
+          userList = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+        } catch (dbErr) {
+          console.warn("Firestore fetch error, falling back to local storage:", dbErr);
+        }
 
+        // Default system admin accounts
+        const defaultUsers = [
+          { id: 'def-3', name: 'Godfrey Wangechi', email: 'wangechigodfrey77@gmail.com', role: 'Super Admin', status: 'Active', added: '2023-01-01', password: 'password123' },
+          { id: 'def-4', name: 'System Admin', email: 'admin@nurseprep.ai', role: 'Admin', status: 'Active', added: '2023-01-01', password: 'password123' }
+        ];
+
+        // Seed Firestore if empty
+        if (userList.length === 0) {
+          for (const u of defaultUsers) {
+            try {
+              await addDoc(collection(db, 'users'), u);
+            } catch (e) {
+              console.warn("Failed to seed user to Firestore:", e);
+            }
+          }
+        }
+
+        // Retrieve local storage custom users
+        const localUsers = JSON.parse(localStorage.getItem('nurseprep_custom_users') || '[]');
+
+        // Combine into unified map keyed by email
+        const userMap = new Map<string, any>();
+        defaultUsers.forEach(u => userMap.set(u.email.toLowerCase(), u));
+        userList.forEach(u => u.email && userMap.set(u.email.toLowerCase(), u));
+        localUsers.forEach((u: any) => u.email && userMap.set(u.email.toLowerCase(), u));
+
+        setUsers(Array.from(userMap.values()));
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  const handleCreateUser = async () => {
+    if (!formData.name || !formData.email || !formData.password) {
+      alert("Please fill in Name, Email, and Temporary Password.");
+      return;
+    }
+
+    const cleanEmail = formData.email.trim().toLowerCase();
     const newUser = {
-      id: `${activeTab === 'lecturers' ? 'L' : 'A'}-${Math.floor(Math.random() * 1000)}`,
-      name: formData.name,
-      email: formData.email,
+      name: formData.name.trim(),
+      email: cleanEmail,
+      password: formData.password,
       role: formData.role || (activeTab === 'lecturers' ? 'Staff / Lecturer' : 'Admin'),
       status: 'Active',
       added: new Date().toISOString().split('T')[0]
     };
 
-    if (activeTab === 'lecturers') {
-      setLecturers([...lecturers, newUser]);
-    } else {
-      setAdmins([...admins, newUser]);
+    let newDocId = `local-${Date.now()}`;
+
+    // 1. Save to Firestore
+    try {
+      const docRef = await addDoc(collection(db, 'users'), newUser);
+      newDocId = docRef.id;
+    } catch (error) {
+      console.warn("Firestore user creation warning, stored locally:", error);
     }
+
+    // 2. Save to localStorage to guarantee persistent retention across logouts/reloads
+    const localUsers = JSON.parse(localStorage.getItem('nurseprep_custom_users') || '[]');
+    const updatedLocal = [...localUsers.filter((u: any) => u.email !== cleanEmail), { id: newDocId, ...newUser }];
+    localStorage.setItem('nurseprep_custom_users', JSON.stringify(updatedLocal));
+
+    // Update state
+    setUsers(prev => {
+      const filtered = prev.filter(u => u.email?.toLowerCase() !== cleanEmail);
+      return [...filtered, { id: newDocId, ...newUser }];
+    });
+
     setShowAddModal(false);
     setFormData({ name: '', email: '', password: '', role: '' });
+    alert(`Lecturer/Staff account (${cleanEmail}) successfully created and saved! They can now log in using these credentials.`);
   };
 
+  const lecturers = users.filter(u => u.role === 'Staff / Lecturer' || u.role?.toLowerCase().includes('staff') || u.role?.toLowerCase().includes('lecturer'));
+  const admins = users.filter(u => u.role === 'Admin' || u.role === 'Super Admin' || u.role?.toLowerCase().includes('admin'));
   const displayUsers = activeTab === 'lecturers' ? lecturers : admins;
 
   return (
@@ -99,8 +169,8 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {displayUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+              {displayUsers.map((user, index) => (
+                <tr key={user.id || user.email || `user-${index}`} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
