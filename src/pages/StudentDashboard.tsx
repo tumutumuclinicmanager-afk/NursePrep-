@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { BookOpen, CheckCircle, Clock, TrendingUp, BrainCircuit, Activity, Target, Flame, Medal, Award, Star } from 'lucide-react';
+import { BookOpen, CheckCircle, Clock, TrendingUp, BrainCircuit, Activity, Target, Flame, Medal, Award, Star, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
+import { NURSING_UNITS } from '@/data/quizQuestions';
+import QuizGeneratorPage from './QuizGeneratorPage';
 
 export default function StudentDashboard() {
   const [stats, setStats] = useState({
@@ -14,29 +16,35 @@ export default function StudentDashboard() {
   });
   const [history, setHistory] = useState<any[]>([]);
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!auth.currentUser) return;
-      try {
-        const historyRef = collection(db, 'examHistory');
-        const q = query(historyRef, where('user', '==', auth.currentUser.email));
-        const querySnapshot = await getDocs(q);
-        
-        const data = querySnapshot.docs.map(doc => doc.data());
-        setHistory(data);
-        
-        if (data.length > 0) {
-          setStats({
-            questionsAnswered: data.reduce((acc, curr) => acc + (curr.totalQuestions || 0), 0),
-            averageScore: Math.round(data.reduce((acc, curr) => acc + (curr.score || 0), 0) / data.length),
-            streak: 1, 
-            xp: data.length * 50 
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching user data", error);
+  // Quick Quiz Generator Widget State
+  const [selectedUnit, setSelectedUnit] = useState<string>('All');
+  const [questionCount, setQuestionCount] = useState<number>(5);
+  const [showQuizModal, setShowQuizModal] = useState<boolean>(false);
+
+  const fetchUserData = async () => {
+    if (!auth.currentUser) return;
+    try {
+      const historyRef = collection(db, 'examHistory');
+      const q = query(historyRef, where('user', '==', auth.currentUser.email));
+      const querySnapshot = await getDocs(q);
+      
+      const data = querySnapshot.docs.map(doc => doc.data());
+      setHistory(data);
+      
+      if (data.length > 0) {
+        setStats({
+          questionsAnswered: data.reduce((acc, curr) => acc + (curr.totalQuestions || 0), 0),
+          averageScore: Math.round(data.reduce((acc, curr) => acc + (curr.score || 0), 0) / data.length),
+          streak: 1, 
+          xp: data.length * 50 
+        });
       }
-    };
+    } catch (error) {
+      console.error("Error fetching user data", error);
+    }
+  };
+
+  useEffect(() => {
     fetchUserData();
   }, []);
 
@@ -224,25 +232,57 @@ export default function StudentDashboard() {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-slate-400">Category</label>
-                <select className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded outline-none focus:ring-1 focus:ring-blue-500">
-                  <option>Medical Surgical</option>
-                  <option>Pediatrics</option>
+                <label className="text-[10px] uppercase font-bold text-slate-400">Unit / Specialty</label>
+                <select 
+                  value={selectedUnit}
+                  onChange={(e) => setSelectedUnit(e.target.value)}
+                  className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                >
+                  <option value="All">All Units ({NURSING_UNITS.length})</option>
+                  {NURSING_UNITS.map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] uppercase font-bold text-slate-400">Questions</label>
-                <select className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded outline-none focus:ring-1 focus:ring-blue-500">
-                  <option>20 Questions</option>
-                  <option>50 Questions</option>
+                <select 
+                  value={questionCount}
+                  onChange={(e) => setQuestionCount(Number(e.target.value))}
+                  className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                >
+                  <option value={5}>5 Questions</option>
+                  <option value={10}>10 Questions</option>
+                  <option value={15}>15 Questions</option>
+                  <option value={20}>20 Questions</option>
                 </select>
               </div>
             </div>
-            <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 transition-colors text-white rounded-lg font-bold text-sm shadow-md shadow-blue-200">
+            <button 
+              onClick={() => setShowQuizModal(true)}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 transition-colors text-white rounded-lg font-bold text-sm shadow-md shadow-blue-200 flex items-center justify-center gap-2"
+            >
               Launch Smart Quiz
             </button>
           </div>
         </div>
+
+        {/* Modal Overlay for Quick Quiz Generator */}
+        {showQuizModal && (
+          <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-2 relative shadow-2xl">
+              <QuizGeneratorPage 
+                embeddedModal={true}
+                initialUnit={selectedUnit}
+                initialQuestionCount={questionCount}
+                onCloseModal={() => {
+                  setShowQuizModal(false);
+                  fetchUserData();
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Smart Study Assistant */}
         <div className="bg-slate-900 text-white p-5 rounded-xl flex-1 flex flex-col min-h-[250px]">

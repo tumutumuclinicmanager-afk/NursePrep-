@@ -355,7 +355,7 @@ export default function QuestionBuilder({ onQuestionSaved }: { onQuestionSaved?:
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <div className="inline-flex items-center gap-2 bg-blue-800/60 px-3 py-1 rounded-full text-xs font-semibold text-blue-200 mb-2 border border-blue-700/50">
-              <Sparkles className="w-3.5 h-3.5" /> Lecturer Exam Studio
+              Exam suite
             </div>
             <h2 className="text-2xl font-bold tracking-tight">Interactive Question & Parameter Builder</h2>
             <p className="text-blue-200 text-sm mt-1 max-w-2xl">

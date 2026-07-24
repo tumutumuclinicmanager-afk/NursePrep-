@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { PublicLayout } from './layouts/PublicLayout';
 import { DashboardLayout } from './layouts/DashboardLayout';
@@ -19,8 +19,11 @@ import Analytics from './pages/admin/Analytics';
 import UploadExams from './pages/staff/UploadExams';
 import LiveSessions from './pages/staff/LiveSessions';
 import StudentQueries from './pages/staff/StudentQueries';
-
 import Pricing from './pages/Pricing';
+import { auth } from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+
+import QuizGeneratorPage from './pages/QuizGeneratorPage';
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -30,12 +33,53 @@ function PlaceholderPage({ title }: { title: string }) {
   );
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode; allowedRole?: string }) {
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(auth.currentUser);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const userRole = localStorage.getItem('userRole');
-  if (!userRole) {
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!user && !userRole) {
     return <Navigate to="/login" replace />;
   }
+
+  if (allowedRole && userRole && userRole !== allowedRole) {
+    if (userRole === 'admin') return <Navigate to="/admin" replace />;
+    if (userRole === 'staff') return <Navigate to="/staff" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return <>{children}</>;
+}
+
+function PublicOrDashboardExams() {
+  const userRole = localStorage.getItem('userRole');
+  if (userRole === 'student' || auth.currentUser) {
+    return <Navigate to="/dashboard/exams" replace />;
+  }
+  if (userRole === 'staff') {
+    return <Navigate to="/staff/upload" replace />;
+  }
+  if (userRole === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+  return <ExamBank />;
 }
 
 export default function App() {
@@ -45,7 +89,7 @@ export default function App() {
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/courses" element={<PlaceholderPage title="Courses" />} />
-          <Route path="/exams" element={<ProtectedRoute><ExamBank /></ProtectedRoute>} />
+          <Route path="/exams" element={<PublicOrDashboardExams />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<PlaceholderPage title="About Us" />} />
           <Route path="/contact" element={<PlaceholderPage title="Contact" />} />
@@ -53,14 +97,30 @@ export default function App() {
           <Route path="/register" element={<Register />} />
         </Route>
         
-        <Route path="/dashboard" element={<DashboardLayout userRole="student" />}>
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute allowedRole="student">
+              <DashboardLayout userRole="student" />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<StudentDashboard />} />
+          <Route path="exams" element={<ExamBank />} />
+          <Route path="generator" element={<QuizGeneratorPage />} />
           <Route path="courses" element={<PlaceholderPage title="My Courses" />} />
           <Route path="performance" element={<PlaceholderPage title="Performance Metrics" />} />
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
         </Route>
 
-        <Route path="/staff" element={<DashboardLayout userRole="staff" />}>
+        <Route 
+          path="/staff" 
+          element={
+            <ProtectedRoute allowedRole="staff">
+              <DashboardLayout userRole="staff" />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<Navigate to="/staff/upload" replace />} />
           <Route path="upload" element={<UploadExams />} />
           <Route path="sessions" element={<LiveSessions />} />
@@ -68,7 +128,14 @@ export default function App() {
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
         </Route>
         
-        <Route path="/admin" element={<DashboardLayout userRole="admin" />}>
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <DashboardLayout userRole="admin" />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<AdminOverview />} />
           <Route path="questions" element={<UploadExams />} />
           <Route path="upload" element={<UploadExams />} />
