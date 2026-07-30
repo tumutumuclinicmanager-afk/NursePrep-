@@ -332,7 +332,9 @@ export default function QuestionBuilder({ onQuestionSaved }: { onQuestionSaved?:
         customParameters: selectedType.isCustom ? { customDetails: customParamsText } : undefined,
       };
 
-      await addDoc(collection(db, 'questions'), newQuestion);
+      // Clean out undefined properties so Firestore SDK accepts the payload
+      const cleanPayload = JSON.parse(JSON.stringify(newQuestion));
+      await addDoc(collection(db, 'questions'), cleanPayload);
 
       setSuccessMsg(`Question successfully created and published under ${selectedExamMode} (${selectedUnit})!`);
       
@@ -342,7 +344,7 @@ export default function QuestionBuilder({ onQuestionSaved }: { onQuestionSaved?:
       if (onQuestionSaved) onQuestionSaved();
     } catch (err: any) {
       console.error('Error saving question:', err);
-      setErrorMsg('Failed to save question to Firestore database.');
+      setErrorMsg(err.message ? `Failed to save question: ${err.message}` : 'Failed to save question to Firestore database.');
     } finally {
       setIsSaving(false);
     }

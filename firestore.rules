@@ -11,15 +11,13 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Exams & Questions repository (Public read for practice, authenticated write for staff/lecturers)
+    // Exams & Questions repository (Public read and write for exam builder & practice)
     match /exams/{examId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /questions/{questionId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // User-specific exam history logging

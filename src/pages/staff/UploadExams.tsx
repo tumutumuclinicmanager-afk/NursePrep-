@@ -62,16 +62,17 @@ export default function UploadExams() {
     setIsSaving(true);
     try {
       // Save exam document
-      await addDoc(collection(db, 'exams'), {
+      const examDoc = JSON.parse(JSON.stringify({
         title: examTitle || 'Untitled Exam',
         questions: extractedQuestions,
         createdAt: new Date().toISOString(),
         category: 'Custom Upload',
-      });
+      }));
+      await addDoc(collection(db, 'exams'), examDoc);
 
       // Also save individual questions to questions bank
       for (const q of extractedQuestions) {
-        await addDoc(collection(db, 'questions'), {
+        const questionDoc = JSON.parse(JSON.stringify({
           examMode: 'NCLEX-RN',
           unitDomain: 'General Nursing',
           questionTypeId: 'single_choice',
@@ -86,7 +87,8 @@ export default function UploadExams() {
           rationale: q.explanation || '',
           createdAt: new Date().toISOString(),
           createdBy: 'PDF Extractor'
-        });
+        }));
+        await addDoc(collection(db, 'questions'), questionDoc);
       }
 
       alert('Exam and extracted questions successfully saved to bank!');
