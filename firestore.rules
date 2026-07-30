@@ -40,6 +40,11 @@ service cloud.firestore {
     match /payments/{paymentId} {
       allow read, write: if isAuthenticated() && (resource == null || resource.data.user == request.auth.token.email || resource.data.userId == request.auth.uid);
     }
+
+    // System & User Notifications
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
     
     // Default rule for other collections
     match /{document=**} {

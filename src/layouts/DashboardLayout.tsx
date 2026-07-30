@@ -4,6 +4,7 @@ import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, FileTe
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { auth, signOut, onAuthStateChanged } from '@/lib/firebase';
+import { NotificationBell } from '@/components/NotificationBell';
 
 export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student' | 'staff' | 'admin' }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -164,12 +165,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
             )}
           </div>
           <div className="flex items-center gap-6">
-            <div className="relative">
-              <button className="relative text-slate-400 hover:text-slate-600 transition-colors flex items-center">
-                <Bell className="w-6 h-6" />
-              </button>
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 border-2 border-white rounded-full text-[10px] text-white flex items-center justify-center font-bold">3</span>
-            </div>
+            <NotificationBell userRole={userRole} />
             <div className="flex items-center gap-3 pl-6 border-l border-slate-200 hidden sm:flex">
               <div className="text-right">
                 <p className="text-sm font-bold leading-none text-slate-900">{userName}</p>
