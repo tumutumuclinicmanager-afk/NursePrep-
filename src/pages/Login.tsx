@@ -58,38 +58,45 @@ export default function Login() {
           userRole = 'student';
         }
       } else {
-        // Fallback for system admin accounts
+        // Fallback for default system admin accounts
         if (normalizedEmail === 'admin@nurseprep.com' || normalizedEmail === 'wangechigodfrey77@gmail.com') {
           userRole = 'admin';
+          isDbUser = true;
+          dbPassword = 'password123';
+          dbName = normalizedEmail === 'admin@nurseprep.com' ? 'System Admin' : 'Godfrey Wangechi';
         } else {
           userRole = 'student';
         }
       }
       
-      // If user is from the database and we have a temporary password set
+      // If user is from database/admin list and has a password recorded
       if (isDbUser && dbPassword) {
         if (password !== dbPassword) {
           throw new Error('Invalid email or password.');
         }
       }
       
-      // Perform Auth Sign In
+      // Perform Auth Sign In with fallback auto-registration for staff/admin users created in DB
       try {
         await signInWithEmailAndPassword(auth, email.trim(), password);
       } catch (authErr: any) {
-        // If user is registered in the DB (like lecturer/admin created by Super Admin) but not yet in Auth, create them now
-        if (isDbUser && (authErr.code === 'auth/user-not-found' || authErr.message?.includes('user-not-found') || authErr.code === 'auth/invalid-credential')) {
+        // If user is in DB (e.g. created by admin) or is default system admin but not yet registered in Firebase Auth
+        if (isDbUser) {
           try {
             const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
             if (userCredential.user) {
-              await updateProfile(userCredential.user, { displayName: dbName });
+              await updateProfile(userCredential.user, { displayName: dbName || email.split('@')[0] });
             }
           } catch (createErr: any) {
+            // If email is already in use in Auth, attempt login error or message
+            if (createErr.code === 'auth/email-already-in-use') {
+              throw new Error('Invalid email or password.');
+            }
             console.error('Failed to auto-register db user in Auth:', createErr);
-            throw authErr; // throw original login error if fallback registration fails
+            throw authErr;
           }
         } else {
-          throw authErr;
+          throw new Error('Invalid email or password.');
         }
       }
       
