@@ -5,9 +5,10 @@ import {
   Search, Filter, BookOpen, Activity, HeartPulse, Brain, Baby, 
   ArrowRight, DollarSign, ShoppingCart, Folder, FolderOpen, 
   ChevronRight, ChevronDown, Clock, HelpCircle, CheckCircle, 
-  Award, Grid, List, Play, Tag, Layers, RefreshCw, X, AlertCircle, Database, Sparkles
+  Award, Grid, List, Play, Tag, Layers, RefreshCw, X, AlertCircle, Database, Sparkles,
+  Bookmark, BookmarkCheck, Trash2, Star
 } from 'lucide-react';
-import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import { ALL_QUIZ_QUESTIONS, normalizeExamCategory } from '@/data/quizQuestions';
@@ -216,18 +217,35 @@ const defaultExamBundles: ExamItem[] = [
   },
 ];
 
+export interface FavoriteItem {
+  id: string;
+  user: string;
+  userId?: string;
+  questionStem: string;
+  options: string[];
+  correctAnswer: string;
+  explanation?: string;
+  category?: string;
+  domain?: string;
+  savedAt?: string;
+}
+
 export default function ExamBank() {
   const navigate = useNavigate();
   const [selectedBoard, setSelectedBoard] = useState('All');
   const [selectedDomain, setSelectedDomain] = useState('All Specialties');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'classified' | 'grid'>('classified');
+  const [viewMode, setViewMode] = useState<'classified' | 'grid' | 'favorites'>('classified');
   
   // State for Firestore loaded exams
   const [examsList, setExamsList] = useState<ExamItem[]>(defaultExamBundles);
   const [loadingDb, setLoadingDb] = useState(false);
   const [dbQuestionsCount, setDbQuestionsCount] = useState(0);
+
+  // Favorites / Bookmarks state
+  const [favoritesList, setFavoritesList] = useState<FavoriteItem[]>([]);
+  const [favoriteToast, setFavoriteToast] = useState<string | null>(null);
 
   // Live Actual Question Counts tracking across all sources
   const [boardQuestionCounts, setBoardQuestionCounts] = useState<Record<string, number>>({
@@ -258,6 +276,108 @@ export default function ExamBank() {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
   const [showRationale, setShowRationale] = useState<Record<number, boolean>>({});
   const [examCompleted, setExamCompleted] = useState(false);
+
+  // Fetch Bookmarked Favorites for logged-in user
+  const fetchUserFavorites = async () => {
+    try {
+      const userKey = auth.currentUser?.email || auth.currentUser?.uid;
+      if (!userKey) return;
+      const favRef = collection(db, 'Favorites');
+      const q = query(favRef, where('user', '==', userKey));
+      const snapshot = await getDocs(q);
+      const list: FavoriteItem[] = snapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data()
+      } as FavoriteItem));
+      setFavoritesList(list);
+    } catch (err) {
+      console.error('Error fetching favorites:', err);
+    }
+  };
+
+  const isQuestionBookmarked = (stem: string) => {
+    return favoritesList.some(f => f.questionStem === stem);
+  };
+
+  const toggleBookmark = async (qObj: any, defaultCategory?: string, defaultDomain?: string) => {
+    const stem = qObj.questionStem || qObj.question || '';
+    if (!stem) return;
+
+    if (!auth.currentUser) {
+      setFavoriteToast('Please sign in to bookmark questions to your Favorites.');
+      setTimeout(() => setFavoriteToast(null), 3000);
+      return;
+    }
+
+    const existing = favoritesList.find(f => f.questionStem === stem);
+    const userKey = auth.currentUser.email || auth.currentUser.uid;
+
+    if (existing) {
+      try {
+        await deleteDoc(doc(db, 'Favorites', existing.id));
+        setFavoritesList(prev => prev.filter(f => f.id !== existing.id));
+        setFavoriteToast('Removed question from Favorites.');
+        setTimeout(() => setFavoriteToast(null), 2500);
+      } catch (err) {
+        console.error('Error removing favorite:', err);
+      }
+    } else {
+      try {
+        const newFav = {
+          user: userKey,
+          userId: auth.currentUser.uid,
+          questionStem: stem,
+          options: qObj.options ? qObj.options.map((o: any) => typeof o === 'string' ? o : o.text) : ['Option A', 'Option B', 'Option C', 'Option D'],
+          correctAnswer: qObj.correctAnswer || (qObj.options ? (qObj.options.find((o: any) => o.isCorrect)?.text || qObj.options[0]?.text) : ''),
+          explanation: qObj.explanation || qObj.rationale || '',
+          category: defaultCategory || qObj.examMode || qObj.category || 'NCK',
+          domain: defaultDomain || qObj.unitDomain || qObj.domain || 'Medical-Surgical Nursing',
+          savedAt: new Date().toISOString()
+        };
+
+        const docRef = await addDoc(collection(db, 'Favorites'), newFav);
+        setFavoritesList(prev => [...prev, { id: docRef.id, ...newFav }]);
+        setFavoriteToast('Saved to your Favorites collection!');
+        setTimeout(() => setFavoriteToast(null), 2500);
+      } catch (err) {
+        console.error('Error adding favorite:', err);
+      }
+    }
+  };
+
+  const startFavoritesPractice = () => {
+    if (favoritesList.length === 0) return;
+    const questions = favoritesList.map(f => ({
+      question: f.questionStem,
+      options: f.options,
+      correctAnswer: f.correctAnswer,
+      explanation: f.explanation
+    }));
+
+    const favExamItem: ExamItem = {
+      id: 'favorites-practice-session',
+      title: 'Bookmarked Favorites Review Practice',
+      category: 'Favorites',
+      domain: 'Personalized Favorites Bank',
+      price: 'Free Practice',
+      numericPrice: 0,
+      questionCount: questions.length,
+      durationMinutes: Math.max(10, questions.length * 2),
+      difficulty: 'Medium',
+      isPremium: false,
+      features: ['Saved Questions', 'Targeted Review', 'Instant Rationale'],
+      icon: Bookmark,
+      color: 'text-amber-600',
+      bg: 'bg-amber-50',
+      questions: questions
+    };
+
+    setPracticeExam(favExamItem);
+    setCurrentQuestionIndex(0);
+    setSelectedAnswers({});
+    setShowRationale({});
+    setExamCompleted(false);
+  };
 
   // Fetch Firestore Exams AND Questions to aggregate exact live counts
   const fetchAllExamsAndQuestions = async () => {
@@ -381,6 +501,7 @@ export default function ExamBank() {
 
   useEffect(() => {
     fetchAllExamsAndQuestions();
+    fetchUserFavorites();
   }, []);
 
   const toggleCategory = (cat: string) => {
@@ -598,7 +719,7 @@ export default function ExamBank() {
               </select>
             </div>
 
-            <div className="flex items-center border border-slate-200 rounded-lg p-1 bg-slate-50">
+            <div className="flex items-center border border-slate-200 rounded-lg p-1 bg-slate-50 gap-1">
               <button
                 onClick={() => setViewMode('classified')}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
@@ -618,6 +739,16 @@ export default function ExamBank() {
                 }`}
               >
                 <Grid className="w-3.5 h-3.5" /> Grid View
+              </button>
+              <button
+                onClick={() => setViewMode('favorites')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                  viewMode === 'favorites'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200'
+                }`}
+              >
+                <Bookmark className="w-3.5 h-3.5 fill-current" /> Favorites ({favoritesList.length})
               </button>
             </div>
           </div>
@@ -778,6 +909,139 @@ export default function ExamBank() {
             })
           )}
         </div>
+      ) : viewMode === 'favorites' ? (
+        /* Saved Favorites Collection View */
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-amber-500 text-white rounded-xl shadow-xs">
+                <Bookmark className="w-6 h-6 fill-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                  My Saved Favorites Collection
+                  <span className="px-2.5 py-0.5 bg-amber-200 text-amber-900 text-xs font-bold rounded-full border border-amber-300">
+                    {favoritesList.length} {favoritesList.length === 1 ? 'Question' : 'Questions'}
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-600 mt-1">
+                  Review and practice questions saved to your personal Firestore Favorites library for high-priority study.
+                </p>
+              </div>
+            </div>
+
+            {favoritesList.length > 0 && (
+              <Button 
+                onClick={startFavoritesPractice}
+                className="bg-amber-600 hover:bg-amber-700 text-white gap-2 shadow-xs shrink-0"
+              >
+                <Play className="w-4 h-4 fill-white" /> Practice Favorites ({favoritesList.length} Qs)
+              </Button>
+            )}
+          </div>
+
+          {favoritesList.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center space-y-4">
+              <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto">
+                <Bookmark className="w-8 h-8" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-slate-800">No Bookmarked Questions Yet</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Click the <strong>Bookmark</strong> button on any question while taking a practice exam to save it here for targeted review!
+                </p>
+              </div>
+              <Button 
+                onClick={() => setViewMode('classified')}
+                variant="outline" 
+                size="sm"
+              >
+                Browse Exam Bank Questions
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {favoritesList.map((fav, index) => (
+                <div 
+                  key={fav.id} 
+                  className="bg-white rounded-xl border border-slate-200 p-5 md:p-6 shadow-xs hover:border-amber-300 transition-all space-y-4"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 font-extrabold text-[11px] rounded-full border border-amber-200">
+                        {fav.category || 'NCK'}
+                      </span>
+                      {fav.domain && (
+                        <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 font-bold text-[11px] rounded-full">
+                          {fav.domain}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400 font-semibold">
+                        Saved: {fav.savedAt ? new Date(fav.savedAt).toLocaleDateString() : 'Recently'}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => toggleBookmark({ questionStem: fav.questionStem })}
+                      className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
+                      title="Remove from Favorites"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Remove</span>
+                    </button>
+                  </div>
+
+                  {/* Question Stem */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                      Question #{index + 1}
+                    </span>
+                    <h4 className="text-base font-bold text-slate-900 leading-snug">
+                      {fav.questionStem}
+                    </h4>
+                  </div>
+
+                  {/* Options */}
+                  {fav.options && fav.options.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      {fav.options.map((opt, optIdx) => {
+                        const isCorrect = opt === fav.correctAnswer;
+                        return (
+                          <div 
+                            key={optIdx}
+                            className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 ${
+                              isCorrect 
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold' 
+                                : 'bg-slate-50 border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <span className="w-5 h-5 rounded-full bg-white text-slate-600 text-[10px] font-bold flex items-center justify-center border border-slate-200 shrink-0">
+                              {String.fromCharCode(65 + optIdx)}
+                            </span>
+                            <span className="flex-grow">{opt}</span>
+                            {isCorrect && <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Clinical Explanation */}
+                  {fav.explanation && (
+                    <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl space-y-1 text-xs">
+                      <span className="font-extrabold text-blue-900 uppercase tracking-wider block text-[10px]">
+                        Clinical Rationale
+                      </span>
+                      <p className="text-blue-950 leading-relaxed">
+                        {fav.explanation}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       ) : (
         /* Grid View */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -871,10 +1135,39 @@ export default function ExamBank() {
                 </div>
 
                 {/* Question Stem */}
-                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                  <p className="font-bold text-slate-900 text-base leading-relaxed">
+                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <p className="font-bold text-slate-900 text-base leading-relaxed flex-grow">
                     {practiceExam.questions[currentQuestionIndex].question}
                   </p>
+                  {(() => {
+                    const currentQ = practiceExam.questions[currentQuestionIndex];
+                    const stem = currentQ.question || currentQ.questionStem;
+                    const bookmarked = isQuestionBookmarked(stem);
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => toggleBookmark(currentQ, practiceExam.category, practiceExam.domain)}
+                        title={bookmarked ? "Remove from Favorites" : "Save to Favorites"}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                          bookmarked 
+                            ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-xs' 
+                            : 'bg-white border-slate-200 text-slate-600 hover:text-amber-700 hover:bg-amber-50 hover:border-amber-200'
+                        }`}
+                      >
+                        {bookmarked ? (
+                          <>
+                            <BookmarkCheck className="w-4 h-4 text-amber-600 fill-amber-500" />
+                            <span>Saved to Favorites</span>
+                          </>
+                        ) : (
+                          <>
+                            <Bookmark className="w-4 h-4 text-slate-400" />
+                            <span>Bookmark</span>
+                          </>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
 
                 {/* Answer Options */}
@@ -1047,6 +1340,14 @@ export default function ExamBank() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Favorite Toast Notification */}
+      {favoriteToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
+          <BookmarkCheck className="w-5 h-5 text-amber-400 fill-amber-400" />
+          <span className="text-xs font-bold">{favoriteToast}</span>
         </div>
       )}
     </div>

@@ -6,29 +6,42 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // User profiles
     match /users/{userId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    match /users {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    match /payments/{paymentId} {
       allow read, write: if isAuthenticated();
     }
 
+    // Exams & Questions repository (Public read for practice, authenticated write for staff/lecturers)
     match /exams/{examId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
+    match /questions/{questionId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // User-specific exam history logging
     match /examHistory/{historyId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.user == request.auth.token.email || resource.data.userId == request.auth.uid);
+    }
+
+    // User-specific favorites & bookmarks
+    match /Favorites/{favoriteId} {
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.user == request.auth.token.email || resource.data.userId == request.auth.uid);
+    }
+
+    match /favorites/{favoriteId} {
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.user == request.auth.token.email || resource.data.userId == request.auth.uid);
+    }
+
+    // Payment transactions
+    match /payments/{paymentId} {
+      allow read, write: if isAuthenticated() && (resource == null || resource.data.user == request.auth.token.email || resource.data.userId == request.auth.uid);
     }
     
-    // Fallback rule for other collections during development
+    // Default rule for other collections
     match /{document=**} {
       allow read, write: if isAuthenticated();
     }
