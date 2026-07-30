@@ -27,10 +27,10 @@ export default function Register() {
       let role = 'Student';
       let userRole = 'student';
       
-      if (userEmail === 'admin@nurseprep.ai' || userEmail === 'wangechigodfrey77@gmail.com') {
+      if (userEmail === 'admin@nurseprep.com' || userEmail === 'wangechigodfrey77@gmail.com') {
         role = 'Admin';
         userRole = 'admin';
-      } else if (userEmail.endsWith('@nurseprep.ai')) {
+      } else if (userEmail.endsWith('@nurseprep.com')) {
         role = 'Staff / Lecturer';
         userRole = 'staff';
       }

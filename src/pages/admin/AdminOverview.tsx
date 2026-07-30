@@ -122,7 +122,7 @@ export default function AdminOverview() {
             </div>
             <div>
               <span className="text-xs font-bold block text-white group-hover:text-emerald-300 transition-colors">Bulk PDF Extractor</span>
-              <span className="text-[10px] text-blue-200">Gemini AI Auto-parsing</span>
+              <span className="text-[10px] text-blue-200">Automated Exam Parsing</span>
             </div>
           </Link>
 
@@ -214,7 +214,7 @@ export default function AdminOverview() {
                   </span>
                </div>
                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                  <span className="text-xs font-bold text-slate-700">Gemini AI Parsing API</span>
+                  <span className="text-xs font-bold text-slate-700">Exam Parsing Engine</span>
                   <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Ready
                   </span>

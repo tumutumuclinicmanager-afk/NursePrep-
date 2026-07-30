@@ -422,10 +422,10 @@ export default function QuizGeneratorPage({
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-200">
                 <BrainCircuit className="w-4 h-4 text-blue-600" />
-                Adaptive AI Quick Quiz Generator
+                Adaptive Clinical Practice Generator
               </div>
               <h1 className="text-2xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
-                Configure Smart Nursing Practice
+                Configure Clinical Nursing Practice
               </h1>
               <p className="text-slate-500 text-sm md:text-base max-w-2xl">
                 Select your target nursing curriculum unit, question types, difficulty level, and mode to launch an instant practice test.

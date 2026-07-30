@@ -151,7 +151,7 @@ export default function UploadExams() {
         <div className="space-y-6">
           <div className="flex flex-col gap-2">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Bulk Upload Exam PDF</h2>
-            <p className="text-slate-500 text-sm">Upload a PDF containing exam questions (and answer key). Gemini AI will extract and structure them automatically.</p>
+            <p className="text-slate-500 text-sm">Upload a PDF containing exam questions (and answer key). The system will extract and structure them automatically for nurse educator review.</p>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-10 text-center">

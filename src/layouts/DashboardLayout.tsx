@@ -46,7 +46,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
       { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
       { name: 'My Courses', icon: BookOpen, path: '/dashboard/courses' },
       { name: 'Exam Bank', icon: BookOpen, path: '/dashboard/exams' },
-      { name: 'AI Exam Generator', icon: Brain, path: '/dashboard/generator' },
+      { name: 'Practice Exam Generator', icon: Brain, path: '/dashboard/generator' },
       { name: 'Performance', icon: FileText, path: '/dashboard/performance' },
     ];
   };
@@ -101,10 +101,15 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
         </nav>
         
         {userRole === 'student' && (
-          <div className="p-4 bg-blue-600 m-4 rounded-xl text-white shadow-lg shadow-blue-200 shrink-0">
-            <p className="text-xs opacity-90">Pro Plan expires in</p>
-            <p className="font-bold text-lg">12 Days</p>
-            <button className="mt-2 w-full py-2 bg-white text-blue-600 rounded-lg text-xs font-bold uppercase tracking-wider">Renew Plan</button>
+          <div className="p-4 bg-slate-900 m-4 rounded-xl text-white shadow-lg shadow-slate-200 shrink-0 border border-slate-800">
+            <p className="text-xs text-amber-400 font-extrabold uppercase tracking-wider">Silver Plan Trial</p>
+            <p className="font-extrabold text-base mt-0.5">Expires in 14 Days</p>
+            <button 
+              onClick={() => navigate('/pricing')}
+              className="mt-3 w-full py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg text-xs font-black uppercase tracking-wider shadow-xs transition-colors"
+            >
+              Upgrade Now
+            </button>
           </div>
         )}
         
