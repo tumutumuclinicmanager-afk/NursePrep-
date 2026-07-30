@@ -30,9 +30,6 @@ export default function Register() {
       if (userEmail === 'admin@nurseprep.com' || userEmail === 'wangechigodfrey77@gmail.com') {
         role = 'Admin';
         userRole = 'admin';
-      } else if (userEmail.endsWith('@nurseprep.com')) {
-        role = 'Staff / Lecturer';
-        userRole = 'staff';
       }
       
       // Save profile to Firestore
@@ -68,11 +65,15 @@ export default function Register() {
           <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white mx-auto mb-4">
             <Stethoscope className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Create an Account</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Student Account Sign Up</h2>
           <p className="text-slate-500 mt-2 text-sm">Join Nurse Prep and start mastering your nursing exams.</p>
         </div>
 
         <div className="p-8">
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs font-medium text-center">
+            <strong>Student Account Registration</strong><br />
+            Lecturer & Staff accounts are created directly by system administrators.
+          </div>
           {error && (
             <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
               {error}

@@ -58,11 +58,9 @@ export default function Login() {
           userRole = 'student';
         }
       } else {
-        // Fallback for hardcoded emails or direct domain matches
+        // Fallback for system admin accounts
         if (normalizedEmail === 'admin@nurseprep.com' || normalizedEmail === 'wangechigodfrey77@gmail.com') {
           userRole = 'admin';
-        } else if (normalizedEmail.endsWith('@nurseprep.com')) {
-          userRole = 'staff';
         } else {
           userRole = 'student';
         }
@@ -134,8 +132,6 @@ export default function Login() {
       } else {
         if (userEmail === 'admin@nurseprep.com' || userEmail === 'wangechigodfrey77@gmail.com') {
           userRole = 'admin';
-        } else if (userEmail.endsWith('@nurseprep.com')) {
-          userRole = 'staff';
         } else {
           userRole = 'student';
         }
