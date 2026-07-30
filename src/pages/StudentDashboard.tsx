@@ -133,7 +133,7 @@ export default function StudentDashboard() {
               {[
                 { rank: 1, name: 'Sarah J.', score: '2,840 XP', me: false },
                 { rank: 2, name: 'Mike R.', score: '2,650 XP', me: false },
-                { rank: 3, name: 'Jane D.', score: '2,450 XP', me: true },
+                { rank: 3, name: auth.currentUser?.displayName || (auth.currentUser?.email ? auth.currentUser.email.split('@')[0] : 'You'), score: `${stats.xp > 0 ? stats.xp : 2450} XP`, me: true },
                 { rank: 4, name: 'Emily C.', score: '2,100 XP', me: false },
               ].map((user, i) => (
                 <div key={i} className={`flex items-center justify-between p-2 rounded-lg ${user.me ? 'bg-blue-50 border border-blue-100' : ''}`}>

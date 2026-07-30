@@ -3,16 +3,49 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, FileText, Bell, LogOut, ChevronRight, Menu, X, Video, MessageSquare, Edit3, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
-import { auth, signOut } from '@/lib/firebase';
+import { auth, signOut, onAuthStateChanged } from '@/lib/firebase';
 
 export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student' | 'staff' | 'admin' }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [userName, setUserName] = useState<string>('User');
+  const [userEmail, setUserEmail] = useState<string>('');
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        if (currentUser.displayName) {
+          setUserName(currentUser.displayName);
+        } else if (currentUser.email) {
+          const namePart = currentUser.email.split('@')[0];
+          setUserName(namePart.charAt(0).toUpperCase() + namePart.slice(1));
+        } else {
+          setUserName('User');
+        }
+        setUserEmail(currentUser.email || '');
+      } else {
+        setUserName('User');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const getInitials = (name: string) => {
+    if (!name || name === 'User') return 'U';
+    const parts = name.trim().split(' ').filter(Boolean);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const accountTypeLabel = 
+    userRole === 'admin' ? 'Admin Account' :
+    userRole === 'staff' ? 'Staff Account' :
+    'Student Account';
 
   const handleSignOut = async () => {
     try {
@@ -139,11 +172,11 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
             </div>
             <div className="flex items-center gap-3 pl-6 border-l border-slate-200 hidden sm:flex">
               <div className="text-right">
-                <p className="text-sm font-bold leading-none text-slate-900">Jane Doe</p>
-                <p className="text-[11px] text-slate-500 leading-none mt-1 capitalize">{userRole}</p>
+                <p className="text-sm font-bold leading-none text-slate-900">{userName}</p>
+                <p className="text-[11px] font-semibold text-blue-600 leading-none mt-1">{accountTypeLabel}</p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center font-bold text-slate-500 overflow-hidden">
-                 JD
+              <div className="w-10 h-10 rounded-full bg-blue-600 text-white border-2 border-white shadow-sm flex items-center justify-center font-extrabold text-sm overflow-hidden shrink-0">
+                 {getInitials(userName)}
               </div>
             </div>
           </div>
