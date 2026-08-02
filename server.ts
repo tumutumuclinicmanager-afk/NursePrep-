@@ -86,7 +86,7 @@ async function startServer() {
       Do not include markdown blocks like \`\`\`json. Just the array.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json"
@@ -174,7 +174,7 @@ Key guidelines:
       });
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: formattedContents,
         config: {
           systemInstruction,
@@ -230,7 +230,7 @@ Key guidelines:
       Do not include markdown blocks like \`\`\`json. Just the array.`;
       
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json"

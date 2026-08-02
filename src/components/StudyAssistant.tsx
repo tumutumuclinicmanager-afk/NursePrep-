@@ -87,10 +87,19 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
         })
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        if (!res.ok) {
+          throw new Error(`Server returned status ${res.status}. ${text.slice(0, 80) ? 'Check API server configuration.' : ''}`);
+        }
+      }
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to reach AI Study Assistant server.');
+        throw new Error(data.error || `Server error (${res.status}): Failed to reach AI Study Assistant.`);
       }
 
       const assistantMsg: Message = {
