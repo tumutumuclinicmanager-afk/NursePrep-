@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { 
   BookOpen, Brain, Activity, Clock, CheckCircle, Clock3, AlertCircle, 
   Search, Play, ArrowRight, ShieldCheck, Layers, Sparkles, RefreshCw, 
-  HelpCircle, ChevronRight, Award, Plus, FolderCheck, Lock, Unlock, FileText
+  HelpCircle, ChevronRight, ChevronLeft, Award, Plus, FolderCheck, Lock, Unlock, FileText
 } from 'lucide-react';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
@@ -77,6 +77,24 @@ export default function MyCourses() {
 
   // Syllabus Modal State
   const [syllabusCourse, setSyllabusCourse] = useState<CourseItem | null>(null);
+
+  // Keyboard Arrow Shortcut Navigation
+  useEffect(() => {
+    if (!practiceCourse || examCompleted) return;
+    const questionsLength = practiceCourse.questions?.length || 0;
+    if (questionsLength === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
+      if (e.key === 'ArrowLeft') {
+        setCurrentQuestionIndex(prev => Math.max(0, prev - 1));
+      } else if (e.key === 'ArrowRight') {
+        setCurrentQuestionIndex(prev => Math.min(questionsLength - 1, prev + 1));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [practiceCourse, examCompleted]);
 
   useEffect(() => {
     if (!auth.currentUser) {
@@ -496,21 +514,76 @@ export default function MyCourses() {
               practiceCourse.questions && practiceCourse.questions.length > 0 ? (() => {
                 const currentQ = normalizeQuestion(practiceCourse.questions[currentQuestionIndex]);
                 return (
-                  <div className="space-y-6">
-                    {/* Progress Indicator */}
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span className="font-semibold text-slate-700">
-                        Question {currentQuestionIndex + 1} of {practiceCourse.questions.length}
-                      </span>
-                      <span>
-                        Progress: {Math.round(((currentQuestionIndex + 1) / practiceCourse.questions.length) * 100)}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div 
-                        className="bg-blue-600 h-full transition-all duration-300" 
-                        style={{ width: `${((currentQuestionIndex + 1) / practiceCourse.questions.length) * 100}%` }}
-                      />
+                  <div className="space-y-6 pb-20">
+                    {/* Progress Indicator & Top Quick Nav Header */}
+                    <div className="space-y-3 bg-slate-50/80 p-4 rounded-xl border border-slate-200/80">
+                      <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-slate-500 font-semibold">
+                        <span className="font-semibold text-slate-700">
+                          Question {currentQuestionIndex + 1} of {practiceCourse.questions.length} ({Math.round(((currentQuestionIndex + 1) / practiceCourse.questions.length) * 100)}%)
+                        </span>
+
+                        {/* Top Header Quick Nav Buttons */}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={currentQuestionIndex === 0}
+                            onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                            className="h-8 text-xs px-3 gap-1 shadow-2xs bg-white"
+                            title="Previous Question (Left Arrow)"
+                          >
+                            <ChevronLeft className="w-4 h-4" /> Previous
+                          </Button>
+
+                          {currentQuestionIndex < practiceCourse.questions.length - 1 ? (
+                            <Button
+                              size="sm"
+                              onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
+                              className="h-8 text-xs px-3 bg-blue-600 hover:bg-blue-700 text-white gap-1 shadow-xs font-bold"
+                              title="Next Question (Right Arrow)"
+                            >
+                              Next <ChevronRight className="w-4 h-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => setExamCompleted(true)}
+                              className="h-8 text-xs px-3 bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-extrabold shadow-xs"
+                            >
+                              Submit <Award className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-blue-600 h-full transition-all duration-300" 
+                          style={{ width: `${((currentQuestionIndex + 1) / practiceCourse.questions.length) * 100}%` }}
+                        />
+                      </div>
+
+                      {/* Question Jump Pills */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pt-1 pb-0.5 no-scrollbar">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                          Jump:
+                        </span>
+                        {practiceCourse.questions.map((_, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setCurrentQuestionIndex(idx)}
+                            className={`w-7 h-7 text-xs font-bold rounded-lg shrink-0 transition-all ${
+                              currentQuestionIndex === idx
+                                ? 'bg-blue-600 text-white shadow-xs scale-105'
+                                : selectedAnswers[idx] !== undefined
+                                ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {idx + 1}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Question Stem */}
@@ -567,40 +640,39 @@ export default function MyCourses() {
                       </div>
                     )}
 
-                    {/* Question Action Bar */}
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                    {/* Sticky Bottom Question Action Bar - Always visible */}
+                    <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md pt-3 pb-3 px-4 sm:px-6 border-t border-slate-200/90 shadow-lg z-30 rounded-b-2xl flex items-center justify-between gap-2 -mx-6 -mb-6">
                       <Button
                         variant="outline"
                         onClick={() => setShowRationale(prev => ({ ...prev, [currentQuestionIndex]: !prev[currentQuestionIndex] }))}
-                        className="text-xs text-purple-700 border-purple-200 hover:bg-purple-50"
+                        className="text-xs text-purple-700 border-purple-200 hover:bg-purple-50 shrink-0"
                       >
                         {showRationale[currentQuestionIndex] ? 'Hide Rationale' : 'Check Rationale'}
                       </Button>
 
-                      <div className="flex gap-2">
-                        {currentQuestionIndex > 0 && (
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-                            className="text-xs"
-                          >
-                            Previous
-                          </Button>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          disabled={currentQuestionIndex === 0}
+                          onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                          className="text-xs font-semibold gap-1"
+                        >
+                          <ChevronLeft className="w-4 h-4" /> Prev
+                        </Button>
 
                         {currentQuestionIndex < practiceCourse.questions.length - 1 ? (
                           <Button 
                             onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold"
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold gap-1 shadow-sm"
                           >
-                            Next Question
+                            Next <ChevronRight className="w-4 h-4" />
                           </Button>
                         ) : (
                           <Button 
                             onClick={() => setExamCompleted(true)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-sm gap-1"
                           >
-                            Submit & View Score
+                            Submit <Award className="w-4 h-4" />
                           </Button>
                         )}
                       </div>
