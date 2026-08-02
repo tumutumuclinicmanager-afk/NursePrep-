@@ -4,22 +4,78 @@ import { createServer as createViteServer } from "vite";
 import multer from "multer";
 import * as pdfParseModule from "pdf-parse";
 import { GoogleGenAI } from "@google/genai";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
-const upload = multer({ storage: multer.memoryStorage() });
+// Enforce 10MB maximum file size limit for uploads
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } 
+});
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  // Trust reverse proxy headers (e.g. Cloud Run / Nginx)
+  app.set("trust proxy", 1);
+
+  // Security headers middleware with adjusted contentSecurityPolicy for Vite preview
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    })
+  );
+
+  // General API Rate Limiter (Max 100 requests per 15 minutes per IP)
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { error: "Too many requests, please try again later." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { trustProxy: false, xForwardedForHeader: false },
+  });
+
+  // Strict Rate Limiter for AI Generation & Upload Endpoints (Max 30 per 15 mins)
+  const aiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: { error: "AI generation quota limit reached for this IP window. Please try again shortly." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { trustProxy: false, xForwardedForHeader: false },
+  });
+
+  app.use("/api/", apiLimiter);
+  app.use(express.json({ limit: "1mb" }));
 
   // AI Quiz Generator Endpoint
-  app.post("/api/generate-quiz", async (req, res) => {
+  app.post("/api/generate-quiz", aiLimiter, async (req, res) => {
     try {
       const { topic, difficulty, count } = req.body;
-      const apiKey = process.env.GEMINI_API_KEY || "dummy_key";
-      const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Generate a ${count}-question nursing exam quiz on ${topic} at a ${difficulty} difficulty level. 
+      
+      if (!topic || typeof topic !== "string" || topic.length > 300) {
+        res.status(400).json({ error: "Invalid or missing topic string (max 300 characters)." });
+        return;
+      }
+
+      const safeCount = Math.min(Math.max(Number(count) || 5, 1), 30);
+      const safeDifficulty = ["easy", "medium", "hard"].includes(String(difficulty).toLowerCase())
+        ? difficulty
+        : "medium";
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      const ai = new GoogleGenAI({ 
+        apiKey: apiKey || "dummy_key",
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+      const prompt = `Generate a ${safeCount}-question nursing exam quiz on ${topic.trim()} at a ${safeDifficulty} difficulty level. 
       Return ONLY a JSON array of objects, where each object has:
       "question" (string), 
       "options" (array of 4 strings), 
@@ -30,7 +86,7 @@ async function startServer() {
       Do not include markdown blocks like \`\`\`json. Just the array.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json"
@@ -47,12 +103,95 @@ async function startServer() {
       res.json({ questions });
     } catch (error) {
       console.error("Quiz generation error:", error);
-      res.status(500).json({ error: "Failed to generate quiz" });
+      res.status(500).json({ error: "Failed to generate quiz safely" });
+    }
+  });
+
+  // AI Study Assistant Endpoint
+  app.post("/api/study-assistant", aiLimiter, async (req, res) => {
+    try {
+      const { message, history, unit, mode } = req.body;
+
+      if (!message || typeof message !== "string" || message.trim().length === 0) {
+        res.status(400).json({ error: "Message string is required." });
+        return;
+      }
+
+      if (message.length > 2000) {
+        res.status(400).json({ error: "Message exceeds maximum length of 2000 characters." });
+        return;
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY || "dummy_key";
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+
+      let systemInstruction = `You are NursePrep AI, an expert NCLEX-RN nursing study tutor, clinical judgment mentor, and exam coach.
+Your mission is to provide accurate, evidence-based, Saunders-standard nursing education.
+Key guidelines:
+1. Prioritize Clinical Judgment (NCLEX Next Generation standards: NGN Clinical Judgment Measurement Model).
+2. Use priority frameworks where applicable (ABC: Airway, Breathing, Circulation; Maslow's Hierarchy of Needs; ADPIE Nursing Process).
+3. Provide memorable nursing mnemonics, medication safety alerts (ISMP high-alert meds), normal laboratory reference values, and key nursing interventions.
+4. Keep answers concise, highly structured (with markdown bolding, bullet points, and callouts), encouraging, and easy to review for exams.`;
+
+      if (unit && typeof unit === "string" && unit !== "All") {
+        systemInstruction += `\nFocus specifically on the nursing domain/specialty: ${unit}.`;
+      }
+
+      if (mode === "mnemonic") {
+        systemInstruction += `\nThe student wants a memory mnemonic or acronym to easily memorize this nursing concept, drug class, or clinical procedure. Format the response with the acronym prominently bolded and explained line-by-line.`;
+      } else if (mode === "flashcards") {
+        systemInstruction += `\nFormat your response as 3 to 5 clear, high-yield NCLEX study flashcards. Format each card with:
+**Q:** Front of card question
+**A:** Back of card answer & key rationale`;
+      } else if (mode === "rationale") {
+        systemInstruction += `\nProvide a comprehensive NCLEX question rationale breakdown explaining why the correct option is right and why distracting options are incorrect.`;
+      }
+
+      // Format history messages if provided
+      let formattedContents: any[] = [];
+      if (Array.isArray(history) && history.length > 0) {
+        for (const item of history.slice(-10)) {
+          if (item && item.role && item.text && typeof item.text === 'string') {
+            formattedContents.push({
+              role: item.role === 'user' ? 'user' : 'model',
+              parts: [{ text: item.text.substring(0, 1500) }]
+            });
+          }
+        }
+      }
+
+      // Append current user prompt
+      formattedContents.push({
+        role: 'user',
+        parts: [{ text: message.trim() }]
+      });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: formattedContents,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        }
+      });
+
+      const replyText = response.text || "I apologize, I couldn't generate a response right now. Please rephrase your query.";
+      res.json({ reply: replyText });
+    } catch (error: any) {
+      console.error("Study assistant error:", error);
+      res.status(500).json({ error: error?.message || "Failed to process study assistant request" });
     }
   });
 
   // PDF Import / Quiz Mixing
-  app.post("/api/upload-exam", upload.single("pdf"), async (req, res) => {
+  app.post("/api/upload-exam", aiLimiter, upload.single("pdf"), async (req, res) => {
     try {
       if (!req.file) {
         res.status(400).json({ error: "No file uploaded" });
@@ -91,7 +230,7 @@ async function startServer() {
       Do not include markdown blocks like \`\`\`json. Just the array.`;
       
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json"
@@ -115,7 +254,18 @@ async function startServer() {
 
   // Mock M-Pesa Payment
   app.post("/api/payment/stkpush", async (req, res) => {
-    const { phone, amount, courseId } = req.body;
+    const { phone, amount } = req.body;
+    
+    if (!phone || typeof phone !== "string" || !/^\+?[0-9]{9,15}$/.test(phone.trim())) {
+      res.status(400).json({ error: "Invalid phone number format provided." });
+      return;
+    }
+
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      res.status(400).json({ error: "Invalid payment amount." });
+      return;
+    }
+
     const unlockCode = Math.random().toString(36).substring(2, 10).toUpperCase();
     
     res.json({ 

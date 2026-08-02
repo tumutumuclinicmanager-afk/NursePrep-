@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, GraduationCap, Brain, Stethoscope, FileText, Activity, Edit3, Upload, Database, CheckCircle2 } from 'lucide-react';
+import { Users, GraduationCap, Brain, Stethoscope, FileText, Activity, Edit3, Upload, Database, CheckCircle2, Award } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -99,7 +99,7 @@ export default function AdminOverview() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
           <Link 
             to="/admin/questions" 
             className="bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl p-3.5 flex items-center gap-3 transition-colors group"
@@ -123,6 +123,19 @@ export default function AdminOverview() {
             <div>
               <span className="text-xs font-bold block text-white group-hover:text-emerald-300 transition-colors">Bulk PDF Extractor</span>
               <span className="text-[10px] text-blue-200">Automated Exam Parsing</span>
+            </div>
+          </Link>
+
+          <Link 
+            to="/admin/badges" 
+            className="bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl p-3.5 flex items-center gap-3 transition-colors group"
+          >
+            <div className="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0">
+              <Award className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs font-bold block text-white group-hover:text-amber-300 transition-colors">Badges & Gamification</span>
+              <span className="text-[10px] text-blue-200">Configure streak rules</span>
             </div>
           </Link>
 

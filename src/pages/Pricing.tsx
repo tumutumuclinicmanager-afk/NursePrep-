@@ -167,11 +167,11 @@ export default function Pricing() {
         createdAt: new Date().toISOString()
       });
 
-      setPaymentSuccessMessage(`Payment of ${formatPrice(selectedPlan.usdPrice)} via Stripe Credit Card was successful! Full ${selectedPlan.name} access has been granted.`);
+      setPaymentSuccessMessage(`Payment of ${formatPrice(selectedPlan.usdPrice)} via Stripe Credit Card was successful! Full ${selectedPlan.name} access has been granted in your My Courses tab.`);
       setTimeout(() => {
         setShowPaymentModal(false);
         setIsSubmitting(false);
-        navigate('/dashboard');
+        navigate('/dashboard/courses');
       }, 2500);
     } catch (error) {
       console.error('Stripe payment error:', error);
@@ -216,7 +216,7 @@ export default function Pricing() {
       setTimeout(() => {
         setShowPaymentModal(false);
         setIsSubmitting(false);
-        navigate('/dashboard');
+        navigate('/dashboard/courses');
       }, 2500);
     } catch (error) {
       console.error('M-Pesa payment error:', error);

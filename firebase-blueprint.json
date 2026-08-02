@@ -1,0 +1,142 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered user profile and role settings",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "User email address" },
+        "name": { "type": "string", "description": "User display name" },
+        "role": { "type": "string", "enum": ["student", "staff", "admin"], "description": "Assigned access role" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of account registration" }
+      },
+      "required": ["email", "role"]
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "Nursing exam container",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200, "description": "Title of the exam" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["title"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "NCLEX-RN or Nursing Qbank question",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string", "maxLength": 5000, "description": "Question stem text" },
+        "options": { "type": "array", "description": "Answer choice options" },
+        "correctAnswer": { "type": "string", "description": "Correct choice" },
+        "explanation": { "type": "string", "maxLength": 5000, "description": "Rationale" },
+        "examMode": { "type": "string", "description": "Mode e.g. NCLEX-RN" },
+        "unitDomain": { "type": "string", "description": "Nursing domain or subject" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["question", "options", "correctAnswer"]
+    },
+    "ExamHistory": {
+      "title": "ExamHistory",
+      "description": "Student quiz performance log",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase user UID" },
+        "user": { "type": "string", "description": "User email" },
+        "score": { "type": "number", "description": "Achieved score percentage" },
+        "totalQuestions": { "type": "number", "description": "Number of questions in attempt" },
+        "timestamp": { "type": "string", "description": "ISO completion timestamp" }
+      },
+      "required": ["userId", "score"]
+    },
+    "Favorite": {
+      "title": "Favorite",
+      "description": "User saved question or exam bookmark",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase user UID" },
+        "user": { "type": "string", "description": "User email" },
+        "questionId": { "type": "string", "description": "Saved question ID" },
+        "createdAt": { "type": "string", "description": "Bookmark timestamp" }
+      },
+      "required": ["userId", "questionId"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Subscription or test unlock transaction",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase user UID" },
+        "user": { "type": "string", "description": "User email" },
+        "amount": { "type": "number", "description": "Payment amount" },
+        "status": { "type": "string", "description": "Transaction status" },
+        "timestamp": { "type": "string", "description": "ISO payment timestamp" }
+      },
+      "required": ["userId", "amount"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System or user alert notification",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200, "description": "Notification title" },
+        "message": { "type": "string", "maxLength": 1000, "description": "Notification body text" },
+        "read": { "type": "boolean", "description": "Read status" },
+        "timestamp": { "type": "string", "description": "Time label or ISO date" },
+        "targetRole": { "type": "string", "description": "Target audience" }
+      },
+      "required": ["title", "message"]
+    },
+    "BadgeConfig": {
+      "title": "BadgeConfig",
+      "description": "Student gamification badge rule",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Badge title" },
+        "description": { "type": "string", "description": "Unlock criteria explanation" },
+        "conditionType": { "type": "string", "enum": ["beginner", "streak", "questionsCount", "score"], "description": "Rule logic trigger" },
+        "conditionValue": { "type": "number", "description": "Target threshold value" },
+        "icon": { "type": "string", "description": "Lucide icon key" },
+        "color": { "type": "string", "description": "Tailwind text color class" },
+        "bg": { "type": "string", "description": "Tailwind bg color class" },
+        "enabled": { "type": "boolean", "description": "Active state" }
+      },
+      "required": ["name", "conditionType", "conditionValue"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User accounts and permissions"
+    },
+    "/exams/{examId}": {
+      "schema": { "$ref": "#/entities/Exam" },
+      "description": "Exam suite repository"
+    },
+    "/questions/{questionId}": {
+      "schema": { "$ref": "#/entities/Question" },
+      "description": "Question bank repository"
+    },
+    "/examHistory/{historyId}": {
+      "schema": { "$ref": "#/entities/ExamHistory" },
+      "description": "User exam performance records"
+    },
+    "/favorites/{favoriteId}": {
+      "schema": { "$ref": "#/entities/Favorite" },
+      "description": "User bookmarked questions"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "User payment records"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "App notification alerts"
+    },
+    "/badgeConfigs/{badgeId}": {
+      "schema": { "$ref": "#/entities/BadgeConfig" },
+      "description": "Configurable badge gamification rules"
+    }
+  }
+}

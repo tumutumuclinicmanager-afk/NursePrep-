@@ -2,51 +2,113 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Helper functions
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    // User profiles - allow read and write for auth lookup and user creation
-    match /users/{userId} {
-      allow read, write: if true;
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Exams & Questions repository (Public read and write for exam builder & practice)
+    function isUserDocOwner(resourceData) {
+      return isSignedIn() && (
+        resourceData.userId == request.auth.uid || 
+        resourceData.user == request.auth.token.email
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'wangechigodfrey77@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isStaff() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff')
+      );
+    }
+
+    // User profiles - prevents self-assigned role escalation
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) || isAdmin();
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Exams & Questions repository (Public read for practice, staff/admin write control)
     match /exams/{examId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update, delete: if isStaff();
     }
 
     match /questions/{questionId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update, delete: if isStaff();
     }
 
     // User-specific exam history logging
     match /examHistory/{historyId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.user == request.auth.token.email || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn() && (isUserDocOwner(resource.data) || isStaff());
+      allow create: if isSignedIn() && (
+        request.resource.data.userId == request.auth.uid || 
+        request.resource.data.user == request.auth.token.email
+      );
+      allow update, delete: if isSignedIn() && (isUserDocOwner(resource.data) || isAdmin());
     }
 
     // User-specific favorites & bookmarks
     match /Favorites/{favoriteId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.user == request.auth.token.email || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn() && (isUserDocOwner(resource.data) || isStaff());
+      allow create: if isSignedIn() && (
+        request.resource.data.userId == request.auth.uid || 
+        request.resource.data.user == request.auth.token.email
+      );
+      allow update, delete: if isSignedIn() && (isUserDocOwner(resource.data) || isAdmin());
     }
 
     match /favorites/{favoriteId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.user == request.auth.token.email || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn() && (isUserDocOwner(resource.data) || isStaff());
+      allow create: if isSignedIn() && (
+        request.resource.data.userId == request.auth.uid || 
+        request.resource.data.user == request.auth.token.email
+      );
+      allow update, delete: if isSignedIn() && (isUserDocOwner(resource.data) || isAdmin());
     }
 
     // Payment transactions
     match /payments/{paymentId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.user == request.auth.token.email || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn() && (isUserDocOwner(resource.data) || isStaff());
+      allow create: if isSignedIn() && (
+        request.resource.data.userId == request.auth.uid || 
+        request.resource.data.user == request.auth.token.email
+      );
+      allow update, delete: if isAdmin();
     }
 
     // System & User Notifications
     match /notifications/{notificationId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isStaff();
+      allow update: if isSignedIn() && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']) || isStaff());
+      allow delete: if isSignedIn() && (isStaff() || isAdmin());
+    }
+
+    // Badge Gamification Configurations
+    match /badgeConfigs/{badgeId} {
+      allow read: if true;
+      allow write: if isStaff() || isAdmin();
     }
     
-    // Default rule for other collections
+    // Default fallback deny rule
     match /{document=**} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if false;
     }
   }
 }
+

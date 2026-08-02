@@ -30,8 +30,8 @@ export default function UserManagement() {
 
         // Default system admin accounts
         const defaultUsers = [
-          { id: 'def-3', name: 'Godfrey Wangechi', email: 'wangechigodfrey77@gmail.com', role: 'Super Admin', status: 'Active', added: '2023-01-01', password: 'password123' },
-          { id: 'def-4', name: 'System Admin', email: 'admin@nurseprep.com', role: 'Admin', status: 'Active', added: '2023-01-01', password: 'password123' }
+          { id: 'def-3', name: 'Godfrey Wangechi', email: 'wangechigodfrey77@gmail.com', role: 'Super Admin', status: 'Active', added: '2023-01-01' },
+          { id: 'def-4', name: 'System Admin', email: 'admin@nurseprep.com', role: 'Admin', status: 'Active', added: '2023-01-01' }
         ];
 
         // Seed Firestore if empty
@@ -75,7 +75,6 @@ export default function UserManagement() {
     const newUser = {
       name: formData.name.trim(),
       email: cleanEmail,
-      password: formData.password,
       role: formData.role || (activeTab === 'lecturers' ? 'Staff / Lecturer' : 'Admin'),
       status: 'Active',
       added: new Date().toISOString().split('T')[0]

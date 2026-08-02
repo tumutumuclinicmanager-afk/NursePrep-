@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Stethoscope } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { auth, db, createUserWithEmailAndPassword, updateProfile } from '@/lib/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { sanitizeInput } from '@/lib/security';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -32,11 +33,11 @@ export default function Register() {
         userRole = 'admin';
       }
       
-      // Save profile to Firestore
-      await addDoc(collection(db, 'users'), {
-        name,
+      // Save profile to Firestore (using setDoc with user.uid to align with rules)
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        userId: userCredential.user.uid,
+        name: sanitizeInput(name),
         email: userEmail,
-        password: password, // Store temporary/initial password for lookup
         role: role,
         status: 'Active',
         added: new Date().toISOString().split('T')[0],

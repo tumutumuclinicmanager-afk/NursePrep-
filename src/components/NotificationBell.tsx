@@ -44,7 +44,7 @@ const DEFAULT_NOTIFICATIONS: Omit<NotificationItem, 'id'>[] = [
     timestamp: '10m ago',
     read: false,
     type: 'exam',
-    link: '/exam-bank',
+    link: '/dashboard/exams',
     targetRole: 'all'
   },
   {
@@ -53,7 +53,7 @@ const DEFAULT_NOTIFICATIONS: Omit<NotificationItem, 'id'>[] = [
     timestamp: '2h ago',
     read: false,
     type: 'payment',
-    link: '/pricing',
+    link: '/dashboard/courses',
     targetRole: 'student'
   },
   {
@@ -62,7 +62,7 @@ const DEFAULT_NOTIFICATIONS: Omit<NotificationItem, 'id'>[] = [
     timestamp: '5h ago',
     read: false,
     type: 'study',
-    link: '/exam-bank',
+    link: '/dashboard/exams',
     targetRole: 'student'
   },
   {
@@ -71,7 +71,7 @@ const DEFAULT_NOTIFICATIONS: Omit<NotificationItem, 'id'>[] = [
     timestamp: '1d ago',
     read: true,
     type: 'system',
-    link: '/live-classes',
+    link: '/dashboard/courses',
     targetRole: 'all'
   }
 ];
@@ -85,36 +85,55 @@ export function NotificationBell({ userRole = 'student' }: { userRole?: string }
 
   // Load & sync notifications from Firestore with automatic seeding if empty
   useEffect(() => {
-    const q = query(collection(db, 'notifications'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (snapshot.empty) {
-        // Seed initial default notifications into Firestore
-        DEFAULT_NOTIFICATIONS.forEach(async (notif, idx) => {
-          try {
-            const notifId = `notif-seed-${idx + 1}`;
-            await setDoc(doc(db, 'notifications', notifId), {
-              ...notif,
-              createdAt: new Date().toISOString()
-            });
-          } catch (err) {
-            console.error('Error seeding notifications:', err);
-          }
-        });
-      } else {
-        const loaded: NotificationItem[] = snapshot.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        } as NotificationItem));
+    let unsubscribe: () => void = () => {};
 
-        // Filter by targetRole if specified
-        const userNotifs = loaded.filter(n => !n.targetRole || n.targetRole === 'all' || n.targetRole === userRole);
-        setNotifications(userNotifs);
-      }
-    }, (err) => {
-      console.error('Notification snapshot error:', err);
-      // Fallback local memory state if Firestore encounters network issues
+    try {
+      const q = query(collection(db, 'notifications'));
+      unsubscribe = onSnapshot(q, (snapshot) => {
+        if (!snapshot || snapshot.empty) {
+          // Populate local state immediately so user sees notifications
+          setNotifications(DEFAULT_NOTIFICATIONS.map((n, i) => ({ ...n, id: `notif-seed-${i + 1}` })));
+
+          // Seed initial default notifications into Firestore in background
+          DEFAULT_NOTIFICATIONS.forEach(async (notif, idx) => {
+            try {
+              const notifId = `notif-seed-${idx + 1}`;
+              await setDoc(doc(db, 'notifications', notifId), {
+                ...notif,
+                createdAt: new Date().toISOString()
+              });
+            } catch (err) {
+              console.warn('Error seeding notifications:', err);
+            }
+          });
+        } else {
+          const loaded: NotificationItem[] = snapshot.docs.map(docSnap => {
+            const data = docSnap.data() || {};
+            return {
+              id: docSnap.id,
+              title: data.title || 'Alert',
+              message: data.message || '',
+              timestamp: data.timestamp || 'Just now',
+              read: Boolean(data.read),
+              type: data.type || 'system',
+              link: data.link || '',
+              targetRole: data.targetRole || 'all'
+            };
+          });
+
+          // Filter by targetRole if specified
+          const userNotifs = loaded.filter(n => !n.targetRole || n.targetRole === 'all' || n.targetRole === userRole);
+          setNotifications(userNotifs.length > 0 ? userNotifs : DEFAULT_NOTIFICATIONS.map((n, i) => ({ ...n, id: `local-${i}` })));
+        }
+      }, (err) => {
+        console.warn('Notification snapshot warning:', err);
+        // Fallback local memory state if Firestore encounters network/permission issues
+        setNotifications(DEFAULT_NOTIFICATIONS.map((n, i) => ({ ...n, id: `local-${i}` })));
+      });
+    } catch (e) {
+      console.warn('Failed to setup notifications listener:', e);
       setNotifications(DEFAULT_NOTIFICATIONS.map((n, i) => ({ ...n, id: `local-${i}` })));
-    });
+    }
 
     return () => unsubscribe();
   }, [userRole]);
@@ -136,31 +155,38 @@ export function NotificationBell({ userRole = 'student' }: { userRole?: string }
 
   const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    try {
-      await updateDoc(doc(db, 'notifications', id), { read: true });
-    } catch {
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    if (id && !id.startsWith('local-')) {
+      try {
+        await updateDoc(doc(db, 'notifications', id), { read: true });
+      } catch (err) {
+        console.warn('Firestore mark as read error:', err);
+      }
     }
   };
 
-  const handleMarkAllAsRead = async () => {
-    const unread = notifications.filter(n => !n.read);
+  const handleMarkAllAsRead = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    const unread = notifications.filter(n => !n.read && n.id && !n.id.startsWith('local-'));
     for (const notif of unread) {
       try {
         await updateDoc(doc(db, 'notifications', notif.id), { read: true });
-      } catch {
-        // fallback
+      } catch (err) {
+        console.warn('Firestore mark all read error:', err);
       }
     }
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      await deleteDoc(doc(db, 'notifications', id));
-    } catch {
-      setNotifications(prev => prev.filter(n => n.id !== id));
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    if (id && !id.startsWith('local-')) {
+      try {
+        await deleteDoc(doc(db, 'notifications', id));
+      } catch (err) {
+        console.warn('Firestore delete notification error:', err);
+      }
     }
   };
 
@@ -169,7 +195,11 @@ export function NotificationBell({ userRole = 'student' }: { userRole?: string }
       handleMarkAsRead(notif.id);
     }
     if (notif.link) {
-      navigate(notif.link);
+      try {
+        navigate(notif.link);
+      } catch (err) {
+        console.error('Navigation error from notification:', err);
+      }
       setIsOpen(false);
     }
   };

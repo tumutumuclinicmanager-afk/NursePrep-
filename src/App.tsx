@@ -13,6 +13,7 @@ import ExamBank from './pages/ExamBank';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminOverview from './pages/admin/AdminOverview';
+import AdminBadges from './pages/admin/AdminBadges';
 import UserManagement from './pages/admin/UserManagement';
 import Payments from './pages/admin/Payments';
 import Analytics from './pages/admin/Analytics';
@@ -24,6 +25,8 @@ import { auth } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 import QuizGeneratorPage from './pages/QuizGeneratorPage';
+import StudyAssistantPage from './pages/StudyAssistantPage';
+import MyCourses from './pages/MyCourses';
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -88,7 +91,7 @@ export default function App() {
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/courses" element={<PlaceholderPage title="Courses" />} />
+          <Route path="/courses" element={<MyCourses />} />
           <Route path="/exams" element={<PublicOrDashboardExams />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<PlaceholderPage title="About Us" />} />
@@ -106,9 +109,10 @@ export default function App() {
           }
         >
           <Route index element={<StudentDashboard />} />
+          <Route path="assistant" element={<StudyAssistantPage />} />
           <Route path="exams" element={<ExamBank />} />
           <Route path="generator" element={<QuizGeneratorPage />} />
-          <Route path="courses" element={<PlaceholderPage title="My Courses" />} />
+          <Route path="courses" element={<MyCourses />} />
           <Route path="performance" element={<PlaceholderPage title="Performance Metrics" />} />
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
         </Route>
@@ -137,6 +141,7 @@ export default function App() {
           }
         >
           <Route index element={<AdminOverview />} />
+          <Route path="badges" element={<AdminBadges />} />
           <Route path="questions" element={<UploadExams />} />
           <Route path="upload" element={<UploadExams />} />
           <Route path="users" element={<UserManagement />} />

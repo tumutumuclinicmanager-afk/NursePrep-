@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, FileText, Bell, LogOut, ChevronRight, Menu, X, Video, MessageSquare, Edit3, Database } from 'lucide-react';
+import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, BrainCircuit, FileText, Bell, LogOut, ChevronRight, Menu, X, Video, MessageSquare, Edit3, Database, Award } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { auth, signOut, onAuthStateChanged } from '@/lib/firebase';
@@ -62,6 +62,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
     if (userRole === 'admin') {
       return [
         { name: 'Overview', icon: LayoutDashboard, path: '/admin' },
+        { name: 'Badges & Streak Config', icon: Award, path: '/admin/badges' },
         { name: 'Question Bank & Creator', icon: Edit3, path: '/admin/questions' },
         { name: 'User Management', icon: GraduationCap, path: '/admin/users' },
         { name: 'Payments', icon: FileText, path: '/admin/payments' },
@@ -82,6 +83,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
       { name: 'Exam Bank', icon: BookOpen, path: '/dashboard/exams' },
       { name: 'Practice Exam Generator', icon: Brain, path: '/dashboard/generator' },
       { name: 'Performance', icon: FileText, path: '/dashboard/performance' },
+      { name: 'AI Study Assistant', icon: BrainCircuit, path: '/dashboard/assistant' },
     ];
   };
 

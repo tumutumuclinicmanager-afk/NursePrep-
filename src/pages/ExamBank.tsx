@@ -12,6 +12,7 @@ import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where } fr
 import { db, auth } from '@/lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import { ALL_QUIZ_QUESTIONS, normalizeExamCategory } from '@/data/quizQuestions';
+import { normalizeQuestion } from '@/lib/utils';
 
 const examBoards = [
   { id: 'All', label: 'All Exam Boards', description: 'Complete library across all licensing authorities' },
@@ -277,6 +278,36 @@ export default function ExamBank() {
   const [showRationale, setShowRationale] = useState<Record<number, boolean>>({});
   const [examCompleted, setExamCompleted] = useState(false);
 
+  // Purchased Exams tracking for current user
+  const [purchasedTitles, setPurchasedTitles] = useState<Set<string>>(new Set());
+
+  const fetchUserPurchases = async () => {
+    try {
+      const userEmail = auth.currentUser?.email;
+      const userId = auth.currentUser?.uid;
+      if (!userEmail && !userId) return;
+
+      const q = query(collection(db, 'payments'));
+      const snapshot = await getDocs(q);
+      const set = new Set<string>();
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (
+          (data.userId === userId || data.user === userEmail) &&
+          (data.status === 'Approved' || data.status === 'Completed')
+        ) {
+          if (data.planName) set.add(data.planName);
+          if (data.plan) set.add(data.plan);
+          if (data.title) set.add(data.title);
+          if (data.examId) set.add(data.examId);
+        }
+      });
+      setPurchasedTitles(set);
+    } catch (err) {
+      console.error('Error fetching user purchases:', err);
+    }
+  };
+
   // Fetch Bookmarked Favorites for logged-in user
   const fetchUserFavorites = async () => {
     try {
@@ -502,6 +533,7 @@ export default function ExamBank() {
   useEffect(() => {
     fetchAllExamsAndQuestions();
     fetchUserFavorites();
+    fetchUserPurchases();
   }, []);
 
   const toggleCategory = (cat: string) => {
@@ -528,6 +560,12 @@ export default function ExamBank() {
   }, {} as Record<string, ExamItem[]>);
 
   const handleAction = (exam: ExamItem) => {
+    // Check if already purchased
+    if (purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id)) {
+      navigate('/dashboard/courses');
+      return;
+    }
+
     if (!exam.isPremium && exam.questions && exam.questions.length > 0) {
       // Launch practice mode
       setPracticeExam(exam);
@@ -548,25 +586,38 @@ export default function ExamBank() {
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser || !mpesaRef || !selectedBundle) return;
+    if (!auth.currentUser || !selectedBundle) return;
     
     setIsSubmitting(true);
     try {
+      const userEmail = auth.currentUser.email || auth.currentUser.uid;
+      const userId = auth.currentUser.uid;
+
       await addDoc(collection(db, 'payments'), {
-        user: auth.currentUser.email,
-        name: auth.currentUser.displayName || auth.currentUser.email,
+        user: userEmail,
+        userId: userId,
+        name: auth.currentUser.displayName || userEmail,
         amount: selectedBundle.price,
         plan: selectedBundle.title,
-        mpesaRef: mpesaRef,
-        status: 'Pending',
-        date: new Date().toLocaleString()
+        planName: selectedBundle.title,
+        examId: selectedBundle.id,
+        category: selectedBundle.category,
+        domain: selectedBundle.domain,
+        questionCount: selectedBundle.questionCount,
+        mpesaRef: mpesaRef || `MP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        status: 'Completed',
+        date: new Date().toLocaleString(),
+        createdAt: new Date().toISOString()
       });
-      alert('Payment details submitted successfully. Access will be granted once verified.');
+
       setShowPaymentModal(false);
       setMpesaRef('');
       setSelectedBundle(null);
+      await fetchUserPurchases();
+      alert(`Success! ${selectedBundle.title} has been unlocked and added to your "My Courses" tab.`);
+      navigate('/dashboard/courses');
     } catch (error) {
-      console.error(error);
+      console.error('Error submitting payment:', error);
       alert('Error submitting payment.');
     } finally {
       setIsSubmitting(false);
@@ -577,12 +628,13 @@ export default function ExamBank() {
     if (!practiceExam || !practiceExam.questions) return { correct: 0, total: 0, percentage: 0 };
     let correct = 0;
     practiceExam.questions.forEach((q, idx) => {
-      if (selectedAnswers[idx] === q.correctAnswer) {
+      const normalized = normalizeQuestion(q);
+      if (selectedAnswers[idx] === normalized.correctAnswer) {
         correct++;
       }
     });
     const total = practiceExam.questions.length;
-    return { correct, total, percentage: Math.round((correct / total) * 100) };
+    return { correct, total, percentage: total > 0 ? Math.round((correct / total) * 100) : 0 };
   };
 
   return (
@@ -881,19 +933,23 @@ export default function ExamBank() {
                             <div className="text-left md:text-right">
                               <span className="text-xs text-slate-400 block font-medium">Access Fee</span>
                               <span className="text-base font-extrabold text-slate-900">
-                                {exam.price}
+                                {purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id) ? 'Enrolled' : exam.price}
                               </span>
                             </div>
 
                             <Button 
                               onClick={() => handleAction(exam)}
                               className={`gap-2 ${
-                                !exam.isPremium 
-                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
-                                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id)
+                                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                                  : !exam.isPremium 
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
                               }`}
                             >
-                              {!exam.isPremium ? (
+                              {purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id) ? (
+                                <><BookOpen className="w-4 h-4" /> Go to My Courses</>
+                              ) : !exam.isPremium ? (
                                 <><Play className="w-4 h-4 fill-white" /> Start Practice</>
                               ) : (
                                 <><ShoppingCart className="w-4 h-4" /> Enroll / Buy</>
@@ -1081,14 +1137,26 @@ export default function ExamBank() {
 
                 <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-t border-slate-100">
                   <div className="text-lg font-bold text-slate-900">
-                    {exam.price}
+                    {purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id) ? 'Enrolled' : exam.price}
                   </div>
                   <Button 
                     onClick={() => handleAction(exam)} 
                     size="sm"
-                    className={!exam.isPremium ? 'bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5' : 'bg-blue-600 hover:bg-blue-700 text-white gap-1.5'}
+                    className={
+                      purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id)
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white gap-1.5'
+                        : !exam.isPremium 
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5' 
+                          : 'bg-blue-600 hover:bg-blue-700 text-white gap-1.5'
+                    }
                   >
-                    {!exam.isPremium ? <><Play className="w-3.5 h-3.5 fill-white" /> Practice</> : <><ShoppingCart className="w-3.5 h-3.5" /> Buy Now</>}
+                    {purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id) ? (
+                      <><BookOpen className="w-3.5 h-3.5" /> My Courses</>
+                    ) : !exam.isPremium ? (
+                      <><Play className="w-3.5 h-3.5 fill-white" /> Practice</>
+                    ) : (
+                      <><ShoppingCart className="w-3.5 h-3.5" /> Buy Now</>
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -1118,135 +1186,134 @@ export default function ExamBank() {
             </div>
 
             {/* Modal Body */}
-            {!examCompleted ? (
-              <div className="p-6 md:p-8 space-y-6">
-                {/* Progress bar */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-bold text-slate-500">
-                    <span>Question {currentQuestionIndex + 1} of {practiceExam.questions.length}</span>
-                    <span>{Math.round(((currentQuestionIndex + 1) / practiceExam.questions.length) * 100)}% Completed</span>
+            {!examCompleted ? (() => {
+              const currentQ = normalizeQuestion(practiceExam.questions[currentQuestionIndex]);
+              const rawCurrentQ = practiceExam.questions[currentQuestionIndex];
+              const bookmarked = isQuestionBookmarked(currentQ.question);
+
+              return (
+                <div className="p-6 md:p-8 space-y-6">
+                  {/* Progress bar */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-bold text-slate-500">
+                      <span>Question {currentQuestionIndex + 1} of {practiceExam.questions.length}</span>
+                      <span>{Math.round(((currentQuestionIndex + 1) / practiceExam.questions.length) * 100)}% Completed</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-blue-600 h-full transition-all duration-300"
+                        style={{ width: `${((currentQuestionIndex + 1) / practiceExam.questions.length) * 100}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-blue-600 h-full transition-all duration-300"
-                      style={{ width: `${((currentQuestionIndex + 1) / practiceExam.questions.length) * 100}%` }}
-                    />
-                  </div>
-                </div>
 
-                {/* Question Stem */}
-                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <p className="font-bold text-slate-900 text-base leading-relaxed flex-grow">
-                    {practiceExam.questions[currentQuestionIndex].question}
-                  </p>
-                  {(() => {
-                    const currentQ = practiceExam.questions[currentQuestionIndex];
-                    const stem = currentQ.question || currentQ.questionStem;
-                    const bookmarked = isQuestionBookmarked(stem);
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => toggleBookmark(currentQ, practiceExam.category, practiceExam.domain)}
-                        title={bookmarked ? "Remove from Favorites" : "Save to Favorites"}
-                        className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-                          bookmarked 
-                            ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-xs' 
-                            : 'bg-white border-slate-200 text-slate-600 hover:text-amber-700 hover:bg-amber-50 hover:border-amber-200'
-                        }`}
-                      >
-                        {bookmarked ? (
-                          <>
-                            <BookmarkCheck className="w-4 h-4 text-amber-600 fill-amber-500" />
-                            <span>Saved to Favorites</span>
-                          </>
-                        ) : (
-                          <>
-                            <Bookmark className="w-4 h-4 text-slate-400" />
-                            <span>Bookmark</span>
-                          </>
-                        )}
-                      </button>
-                    );
-                  })()}
-                </div>
-
-                {/* Answer Options */}
-                <div className="space-y-3">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                    Select the single best answer:
-                  </label>
-                  {practiceExam.questions[currentQuestionIndex].options?.map((opt: string, i: number) => {
-                    const isSelected = selectedAnswers[currentQuestionIndex] === opt;
-                    const isCorrect = opt === practiceExam.questions![currentQuestionIndex].correctAnswer;
-                    const isRevealed = showRationale[currentQuestionIndex];
-
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: opt }));
-                          setShowRationale(prev => ({ ...prev, [currentQuestionIndex]: true }));
-                        }}
-                        className={`w-full p-4 rounded-xl border text-left font-medium text-sm transition-all flex items-start gap-3 ${
-                          isRevealed && isCorrect
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold ring-1 ring-emerald-400'
-                            : isRevealed && isSelected && !isCorrect
-                            ? 'bg-rose-50 border-rose-300 text-rose-950 font-bold'
-                            : isSelected
-                            ? 'bg-blue-50 border-blue-300 text-blue-900 font-bold'
-                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                          {String.fromCharCode(65 + i)}
-                        </span>
-                        <span className="flex-grow">{opt}</span>
-                        {isRevealed && isCorrect && <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Clinical Explanation Rationale */}
-                {showRationale[currentQuestionIndex] && (
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
-                    <span className="text-xs font-extrabold text-blue-900 uppercase tracking-wider block">
-                      Clinical Rationale & Explanation
-                    </span>
-                    <p className="text-xs text-blue-950 leading-relaxed">
-                      {practiceExam.questions[currentQuestionIndex].explanation || 'Proper clinical judgment requires continuous monitoring and adherence to established protocols.'}
+                  {/* Question Stem */}
+                  <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <p className="font-bold text-slate-900 text-base leading-relaxed flex-grow">
+                      {currentQ.question}
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => toggleBookmark(rawCurrentQ, practiceExam.category, practiceExam.domain)}
+                      title={bookmarked ? "Remove from Favorites" : "Save to Favorites"}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                        bookmarked 
+                          ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-xs' 
+                          : 'bg-white border-slate-200 text-slate-600 hover:text-amber-700 hover:bg-amber-50 hover:border-amber-200'
+                      }`}
+                    >
+                      {bookmarked ? (
+                        <>
+                          <BookmarkCheck className="w-4 h-4 text-amber-600 fill-amber-500" />
+                          <span>Saved to Favorites</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bookmark className="w-4 h-4 text-slate-400" />
+                          <span>Bookmark</span>
+                        </>
+                      )}
+                    </button>
                   </div>
-                )}
 
-                {/* Navigation Footer */}
-                <div className="flex justify-between items-center pt-4 border-t border-slate-100">
-                  <Button
-                    variant="outline"
-                    disabled={currentQuestionIndex === 0}
-                    onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-                  >
-                    Previous
-                  </Button>
+                  {/* Answer Options */}
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                      Select the single best answer:
+                    </label>
+                    {currentQ.options.map((opt: string, i: number) => {
+                      const isSelected = selectedAnswers[currentQuestionIndex] === opt;
+                      const isCorrect = opt === currentQ.correctAnswer;
+                      const isRevealed = showRationale[currentQuestionIndex];
 
-                  {currentQuestionIndex < practiceExam.questions.length - 1 ? (
-                    <Button 
-                      onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-                    >
-                      Next Question <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  ) : (
-                    <Button 
-                      onClick={() => setExamCompleted(true)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
-                    >
-                      Complete & View Score <Award className="w-4 h-4" />
-                    </Button>
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: opt }));
+                            setShowRationale(prev => ({ ...prev, [currentQuestionIndex]: true }));
+                          }}
+                          className={`w-full p-4 rounded-xl border text-left font-medium text-sm transition-all flex items-start gap-3 ${
+                            isRevealed && isCorrect
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold ring-1 ring-emerald-400'
+                              : isRevealed && isSelected && !isCorrect
+                              ? 'bg-rose-50 border-rose-300 text-rose-950 font-bold'
+                              : isSelected
+                              ? 'bg-blue-50 border-blue-300 text-blue-900 font-bold'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                            {String.fromCharCode(65 + i)}
+                          </span>
+                          <span className="flex-grow">{opt}</span>
+                          {isRevealed && isCorrect && <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Clinical Explanation Rationale */}
+                  {showRationale[currentQuestionIndex] && (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
+                      <span className="text-xs font-extrabold text-blue-900 uppercase tracking-wider block">
+                        Clinical Rationale & Explanation
+                      </span>
+                      <p className="text-xs text-blue-950 leading-relaxed">
+                        {currentQ.explanation}
+                      </p>
+                    </div>
                   )}
+
+                  {/* Navigation Footer */}
+                  <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                    <Button
+                      variant="outline"
+                      disabled={currentQuestionIndex === 0}
+                      onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                    >
+                      Previous
+                    </Button>
+
+                    {currentQuestionIndex < practiceExam.questions.length - 1 ? (
+                      <Button 
+                        onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                      >
+                        Next Question <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={() => setExamCompleted(true)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                      >
+                        Complete & View Score <Award className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ) : (
+              );
+            })() : (
               /* Score Summary View */
               <div className="p-8 text-center space-y-6">
                 <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
