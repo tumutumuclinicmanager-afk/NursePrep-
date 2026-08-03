@@ -1001,6 +1001,38 @@ export default function ExamBank() {
         </div>
       </div>
 
+      {/* Subtle Upgrade CTA Banner for Free Tier Students */}
+      {userSubscriptionPlan === 'free' && (
+        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-amber-50 border border-blue-200/70 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 transition-all">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Crown className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm md:text-base font-extrabold text-slate-900">Unlock Pro & Sure Pass Question Banks</h3>
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-extrabold rounded-full border border-amber-300">
+                  Free Tier Notice
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                You are currently viewing limited free questions. Upgrade to Pro/Gold to access <strong>+4,000 questions</strong>, exclusive exam types (HESI, ATI Exit Exams, Examplify), and full mock tests.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <Button
+              size="sm"
+              onClick={() => navigate('/pricing')}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-4 py-2 shadow-xs gap-1.5"
+            >
+              <span>Explore Pro Plans</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Live Question Bank Inventory Bar */}
       <div className="bg-white border border-blue-100 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

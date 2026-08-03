@@ -43,15 +43,22 @@ export default function UploadExams() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textErr = await response.text();
+        throw new Error(`Server error (${response.status}): ${textErr.substring(0, 120)}`);
       }
 
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Upload failed');
+      }
+
       setExtractedQuestions(data.questions || []);
       setUploadStatus('success');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading exam:', error);
+      alert(`Upload error: ${error?.message || 'Unknown error'}`);
       setUploadStatus('error');
     } finally {
       setIsUploading(false);
