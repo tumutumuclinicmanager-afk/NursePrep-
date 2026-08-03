@@ -11,7 +11,7 @@ import {
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useNavigate } from 'react-router-dom';
-import { ALL_QUIZ_QUESTIONS, normalizeExamCategory } from '@/data/quizQuestions';
+import { ALL_QUIZ_QUESTIONS, normalizeExamCategory, ALL_EXAM_TYPES, ENTRANCE_EXAMS, NURSING_EXAMS, EXIT_EXAMS } from '@/data/quizQuestions';
 import { normalizeQuestion } from '@/lib/utils';
 
 const clinicalDomains = [
@@ -52,6 +52,107 @@ interface ExamItem {
 }
 
 const defaultExamBundles: ExamItem[] = [
+  // ================= ENTRANCE EXAMS =================
+  { 
+    id: 'ati-teas-mastery', 
+    title: 'ATI TEAS 7 Entrance Mastery Prep', 
+    category: 'ATI TEAS', 
+    domain: 'Nursing Fundamentals', 
+    price: 'Free Access', 
+    numericPrice: 0, 
+    questionCount: 80, 
+    durationMinutes: 90, 
+    difficulty: 'Medium', 
+    isPremium: false, 
+    features: ['Reading & Science Breakdown', 'Math & Chemistry Practice', 'Full Diagnostic Analysis'], 
+    icon: BookOpen, 
+    color: 'text-amber-600', 
+    bg: 'bg-amber-100',
+    requiredPlan: 'free',
+    questionLimits: { free: 10, basic: 40, gold: 0, platinum: 0 }
+  },
+  { 
+    id: 'hesi-a2-entrance', 
+    title: 'HESI A2 Admission Assessment Package', 
+    category: 'HESI A2', 
+    domain: 'Nursing Fundamentals', 
+    price: 'Basic Plan Required', 
+    numericPrice: 15000, 
+    questionCount: 120, 
+    durationMinutes: 120, 
+    difficulty: 'Medium', 
+    isPremium: true, 
+    features: ['Anatomy & Physiology Modules', 'Vocabulary & Grammar', 'Math Conversions'], 
+    icon: HeartPulse, 
+    color: 'text-rose-600', 
+    bg: 'bg-rose-100',
+    requiredPlan: 'basic',
+    questionLimits: { free: 5, basic: 30, gold: 0, platinum: 0 }
+  },
+  { 
+    id: 'accuplacer-prep', 
+    title: 'ACCUPLACER Pre-Nursing Diagnostics', 
+    category: 'ACCUPLACER', 
+    domain: 'Nursing Fundamentals', 
+    price: 'Free Access', 
+    numericPrice: 0, 
+    questionCount: 50, 
+    durationMinutes: 60, 
+    difficulty: 'Beginner', 
+    isPremium: false, 
+    features: ['Quantitative Reasoning', 'Reading Comprehension', 'Sentence Skills'], 
+    icon: Brain, 
+    color: 'text-teal-600', 
+    bg: 'bg-teal-100',
+    requiredPlan: 'free',
+    questionLimits: { free: 10, basic: 25, gold: 0, platinum: 0 }
+  },
+  { 
+    id: 'ged-prep-1', 
+    title: 'GED Science & Pre-Nursing Foundations', 
+    category: 'GED', 
+    domain: 'Nursing Fundamentals', 
+    price: 'Free Access', 
+    numericPrice: 0, 
+    questionCount: 40, 
+    durationMinutes: 50, 
+    difficulty: 'Beginner', 
+    isPremium: false, 
+    features: ['Human Biology Concepts', 'Scientific Reasoning', 'Interactive Quizzes'], 
+    icon: BookOpen, 
+    color: 'text-emerald-600', 
+    bg: 'bg-emerald-100',
+    requiredPlan: 'free',
+    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 },
+    questions: [
+      {
+        question: 'Which cellular organelle is primarily responsible for ATP energy production during aerobic respiration?',
+        options: ['Ribosome', 'Mitochondria', 'Golgi apparatus', 'Endoplasmic reticulum'],
+        correctAnswer: 'Mitochondria',
+        explanation: 'Mitochondria generate cellular energy (ATP) through electron transport and the Krebs cycle.'
+      }
+    ]
+  },
+  { 
+    id: 'hiset-prep', 
+    title: 'HISET Academic Competency Mock Exam', 
+    category: 'HISET', 
+    domain: 'Nursing Fundamentals', 
+    price: 'Free Access', 
+    numericPrice: 0, 
+    questionCount: 45, 
+    durationMinutes: 60, 
+    difficulty: 'Beginner', 
+    isPremium: false, 
+    features: ['High School Equivalency', 'Science & Logic', 'College Preparedness'], 
+    icon: Activity, 
+    color: 'text-cyan-600', 
+    bg: 'bg-cyan-100',
+    requiredPlan: 'free',
+    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 }
+  },
+
+  // ================= NURSING SCHOOL & BOARD EXAMS =================
   { 
     id: 'nck-medsurg-1', 
     title: 'NCK Medical-Surgical Mastery Mock', 
@@ -69,24 +170,6 @@ const defaultExamBundles: ExamItem[] = [
     bg: 'bg-purple-100',
     requiredPlan: 'free',
     questionLimits: { free: 10, basic: 50, gold: 0, platinum: 0 }
-  },
-  { 
-    id: 'nck-complete-bundle', 
-    title: 'NCK Council Licensure Complete Bundle', 
-    category: 'NCK', 
-    domain: 'Community & Public Health', 
-    price: 'Gold Plan Required', 
-    numericPrice: 5000, 
-    questionCount: 250, 
-    durationMinutes: 300, 
-    difficulty: 'Advanced', 
-    isPremium: true, 
-    features: ['10+ Full Mock Exams', 'Past Board Papers', 'Priority Tutor Review'], 
-    icon: Activity, 
-    color: 'text-purple-700', 
-    bg: 'bg-purple-50',
-    requiredPlan: 'gold',
-    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 }
   },
   { 
     id: 'nclex-rn-nextgen-1', 
@@ -127,39 +210,75 @@ const defaultExamBundles: ExamItem[] = [
     ]
   },
   { 
-    id: 'nclex-comprehensive', 
-    title: 'NCLEX Comprehensive CAT Simulation', 
-    category: 'NCLEX-RN', 
+    id: 'nclex-pn-mastery', 
+    title: 'NCLEX-PN Practical Nursing Licensure Set', 
+    category: 'NCLEX-PN', 
     domain: 'Medical-Surgical Nursing', 
-    price: 'Basic Plan Required', 
-    numericPrice: 25000, 
-    questionCount: 500, 
-    durationMinutes: 300, 
-    difficulty: 'Advanced', 
-    isPremium: true, 
-    features: ['Computer Adaptive Test Engine', '1500+ Question Pool', 'Unlimited Re-attempts'], 
-    icon: Brain, 
-    color: 'text-indigo-600', 
-    bg: 'bg-indigo-100',
-    requiredPlan: 'basic',
-    questionLimits: { free: 5, basic: 50, gold: 0, platinum: 0 }
-  },
-  { 
-    id: 'hesi-pediatrics-1', 
-    title: 'HESI Pediatric Nursing Specialty Practice', 
-    category: 'HESI', 
-    domain: 'Pediatric Nursing', 
     price: 'Free Access', 
     numericPrice: 0, 
-    questionCount: 30, 
-    durationMinutes: 45, 
+    questionCount: 60, 
+    durationMinutes: 75, 
     difficulty: 'Medium', 
     isPremium: false, 
-    features: ['Growth & Development Benchmarks', 'Pediatric Dosage Math', 'Detailed Score Reports'], 
+    features: ['LPN Scope of Practice', 'Basic Care & Comfort', 'Safe Medication Administration'], 
+    icon: ShieldCheck, 
+    color: 'text-indigo-600', 
+    bg: 'bg-indigo-100',
+    requiredPlan: 'free',
+    questionLimits: { free: 10, basic: 30, gold: 0, platinum: 0 }
+  },
+  { 
+    id: 'ati-rn-modular', 
+    title: 'ATI RN Pharmacology & MedSurg Modular Test', 
+    category: 'ATI RN', 
+    domain: 'Pharmacology & Parenteral Therapies', 
+    price: 'Basic Plan Required', 
+    numericPrice: 12000, 
+    questionCount: 90, 
+    durationMinutes: 100, 
+    difficulty: 'Advanced', 
+    isPremium: true, 
+    features: ['ATI Nursing Aligned', 'Focused Remediation', 'Detailed Score Reports'], 
+    icon: BookOpen, 
+    color: 'text-orange-600', 
+    bg: 'bg-orange-100',
+    requiredPlan: 'basic',
+    questionLimits: { free: 5, basic: 30, gold: 0, platinum: 0 }
+  },
+  { 
+    id: 'ati-lpn-modular', 
+    title: 'ATI LPN Fundamentals & Practical Nursing', 
+    category: 'ATI LPN', 
+    domain: 'Nursing Fundamentals', 
+    price: 'Free Access', 
+    numericPrice: 0, 
+    questionCount: 65, 
+    durationMinutes: 75, 
+    difficulty: 'Medium', 
+    isPremium: false, 
+    features: ['ATI Practical Nursing', 'Essential Skills', 'Instant Explanations'], 
+    icon: BookOpen, 
+    color: 'text-amber-700', 
+    bg: 'bg-amber-50',
+    requiredPlan: 'free',
+    questionLimits: { free: 10, basic: 30, gold: 0, platinum: 0 }
+  },
+  { 
+    id: 'hesi-rn-specialty', 
+    title: 'HESI RN Specialty Practice Pack', 
+    category: 'HESI RN', 
+    domain: 'Pediatric Nursing', 
+    price: 'Basic Plan Required', 
+    numericPrice: 18000, 
+    questionCount: 75, 
+    durationMinutes: 90, 
+    difficulty: 'Medium', 
+    isPremium: true, 
+    features: ['HESI Curriculum Aligned', 'Growth & Development', 'Dosage Calculation'], 
     icon: Baby, 
     color: 'text-rose-600', 
     bg: 'bg-rose-100',
-    requiredPlan: 'free',
+    requiredPlan: 'basic',
     questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 },
     questions: [
       {
@@ -171,48 +290,114 @@ const defaultExamBundles: ExamItem[] = [
     ]
   },
   { 
-    id: 'hesi-assessment-prep', 
-    title: 'HESI Exit Exam Assessment Package', 
-    category: 'HESI', 
+    id: 'hesi-lpn-specialty', 
+    title: 'HESI LPN Practical Nursing Mastery', 
+    category: 'HESI LPN', 
+    domain: 'Medical-Surgical Nursing', 
+    price: 'Free Access', 
+    numericPrice: 0, 
+    questionCount: 55, 
+    durationMinutes: 70, 
+    difficulty: 'Medium', 
+    isPremium: false, 
+    features: ['Practical Nursing Specialty', 'Clinical Vignettes', 'Step-by-Step Rationales'], 
+    icon: HeartPulse, 
+    color: 'text-pink-600', 
+    bg: 'bg-pink-100',
+    requiredPlan: 'free',
+    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 }
+  },
+  { 
+    id: 'examplify-rn-coursework', 
+    title: 'Examplify RN Coursework & In-School Exam', 
+    category: 'Examplify RN', 
     domain: 'Maternal & Newborn Health', 
     price: 'Gold Plan Required', 
-    numericPrice: 15000, 
-    questionCount: 200, 
-    durationMinutes: 180, 
+    numericPrice: 20000, 
+    questionCount: 85, 
+    durationMinutes: 100, 
     difficulty: 'Advanced', 
     isPremium: true, 
-    features: ['Predictive Exit Score', 'Targeted Remediation', 'Performance Diagnostics'], 
-    icon: HeartPulse, 
-    color: 'text-rose-700', 
-    bg: 'bg-rose-50',
+    features: ['ExamSoft / Examplify Style', 'Timer Simulation', 'Faculty Authored'], 
+    icon: Layers, 
+    color: 'text-violet-600', 
+    bg: 'bg-violet-100',
     requiredPlan: 'gold',
     questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 }
   },
   { 
-    id: 'ged-prep-1', 
-    title: 'GED Science & Pre-Nursing Foundations', 
-    category: 'GED', 
-    domain: 'Nursing Fundamentals', 
+    id: 'examplify-lpn-coursework', 
+    title: 'Examplify LPN Clinical Practice Exam', 
+    category: 'Examplify LPN', 
+    domain: 'Community & Public Health', 
     price: 'Free Access', 
     numericPrice: 0, 
-    questionCount: 40, 
-    durationMinutes: 50, 
-    difficulty: 'Beginner', 
+    questionCount: 50, 
+    durationMinutes: 60, 
+    difficulty: 'Medium', 
     isPremium: false, 
-    features: ['Human Biology Concepts', 'Scientific Reasoning', 'Interactive Quizzes'], 
-    icon: BookOpen, 
-    color: 'text-emerald-600', 
-    bg: 'bg-emerald-100',
+    features: ['ExamSoft Practical Format', 'Community Health', 'Clear Diagnostics'], 
+    icon: Layers, 
+    color: 'text-purple-600', 
+    bg: 'bg-purple-100',
     requiredPlan: 'free',
-    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 },
-    questions: [
-      {
-        question: 'Which cellular organelle is primarily responsible for ATP energy production during aerobic respiration?',
-        options: ['Ribosome', 'Mitochondria', 'Golgi apparatus', 'Endoplasmic reticulum'],
-        correctAnswer: 'Mitochondria',
-        explanation: 'Mitochondria generate cellular energy (ATP) through electron transport and the Krebs cycle.'
-      }
-    ]
+    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 }
+  },
+
+  // ================= EXIT EXAMS =================
+  { 
+    id: 'ati-exit-comprehensive', 
+    title: 'ATI Comprehensive Predictor Exit Exam Mock', 
+    category: 'ATI Exit Exam', 
+    domain: 'Medical-Surgical Nursing', 
+    price: 'Gold Plan Required', 
+    numericPrice: 25000, 
+    questionCount: 180, 
+    durationMinutes: 210, 
+    difficulty: 'Advanced', 
+    isPremium: true, 
+    features: ['99% NCLEX Predictor Score', 'All ATI Modular Topics', 'Comprehensive Focused Review'], 
+    icon: Crown, 
+    color: 'text-amber-600', 
+    bg: 'bg-amber-100',
+    requiredPlan: 'gold',
+    questionLimits: { free: 5, basic: 20, gold: 0, platinum: 0 }
+  },
+  { 
+    id: 'hesi-exit-rn-lpn', 
+    title: 'HESI Exit RN/LPN Graduation Assessment', 
+    category: 'HESI Exit Exam', 
+    domain: 'Critical Care & Emergency Nursing', 
+    price: 'Gold Plan Required', 
+    numericPrice: 25000, 
+    questionCount: 160, 
+    durationMinutes: 180, 
+    difficulty: 'Advanced', 
+    isPremium: true, 
+    features: ['HESI Conversion Score', 'Exit Threshold Benchmarking', 'Remediation Pack'], 
+    icon: HeartPulse, 
+    color: 'text-rose-700', 
+    bg: 'bg-rose-100',
+    requiredPlan: 'gold',
+    questionLimits: { free: 5, basic: 20, gold: 0, platinum: 0 }
+  },
+  { 
+    id: 'examplify-exit-simulation', 
+    title: 'Examplify Nursing Program Exit Simulation', 
+    category: 'Examplify Exit Exam', 
+    domain: 'Nursing Fundamentals & Leadership', 
+    price: 'Gold Plan Required', 
+    numericPrice: 22000, 
+    questionCount: 150, 
+    durationMinutes: 180, 
+    difficulty: 'Advanced', 
+    isPremium: true, 
+    features: ['Final Graduation Barrier Exam', 'ExamSoft Environment Simulation', 'Comprehensive Blueprint'], 
+    icon: ShieldCheck, 
+    color: 'text-indigo-700', 
+    bg: 'bg-indigo-100',
+    requiredPlan: 'gold',
+    questionLimits: { free: 5, basic: 20, gold: 0, platinum: 0 }
   }
 ];
 
@@ -236,6 +421,7 @@ const PLAN_LEVELS: Record<string, number> = {
 
 export default function ExamBank() {
   const navigate = useNavigate();
+  const [selectedExamGroup, setSelectedExamGroup] = useState<'All' | 'Entrance Exams' | 'Nursing Exams' | 'Exit Exams'>('All');
   const [selectedBoard, setSelectedBoard] = useState('All');
   const [selectedDomain, setSelectedDomain] = useState('All Specialties');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
@@ -248,7 +434,7 @@ export default function ExamBank() {
   const [practiceLimitInfo, setPracticeLimitInfo] = useState<{ limit: number; total: number } | null>(null);
 
   // State for dynamic board categories
-  const [dynamicBoardCategories, setDynamicBoardCategories] = useState<string[]>(['NCK', 'NCLEX', 'NCLEX-RN', 'NCLEX-PN', 'HESI', 'GED']);
+  const [dynamicBoardCategories, setDynamicBoardCategories] = useState<string[]>([...ALL_EXAM_TYPES]);
 
   // State for Firestore loaded exams
   const [examsList, setExamsList] = useState<ExamItem[]>(defaultExamBundles);
@@ -553,7 +739,7 @@ export default function ExamBank() {
       setExamsList(combinedExams);
 
       // Collect all unique categories dynamically
-      const categorySet = new Set<string>(['NCK', 'NCLEX-RN', 'HESI', 'GED']);
+      const categorySet = new Set<string>([...ALL_EXAM_TYPES]);
       combinedExams.forEach(e => {
         if (e.category) categorySet.add(e.category);
       });
@@ -606,6 +792,10 @@ export default function ExamBank() {
   };
 
   const filteredExams = examsList.filter(exam => {
+    const matchesGroup = selectedExamGroup === 'All' ||
+      (selectedExamGroup === 'Entrance Exams' && (ENTRANCE_EXAMS as readonly string[]).includes(exam.category)) ||
+      (selectedExamGroup === 'Nursing Exams' && (NURSING_EXAMS as readonly string[]).includes(exam.category)) ||
+      (selectedExamGroup === 'Exit Exams' && (EXIT_EXAMS as readonly string[]).includes(exam.category));
     const matchesBoard = selectedBoard === 'All' || exam.category === selectedBoard;
     const matchesDomain = selectedDomain === 'All Specialties' || exam.domain === selectedDomain;
     const matchesDifficulty = selectedDifficulty === 'All' || exam.difficulty === selectedDifficulty;
@@ -614,7 +804,7 @@ export default function ExamBank() {
       exam.domain.toLowerCase().includes(searchQuery.toLowerCase()) ||
       exam.category.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesBoard && matchesDomain && matchesDifficulty && matchesQuery;
+    return matchesGroup && matchesBoard && matchesDomain && matchesDifficulty && matchesQuery;
   });
 
   // Group filtered exams dynamically by Board Category
@@ -805,6 +995,35 @@ export default function ExamBank() {
         </div>
       </div>
 
+      {/* High-Level Exam Group Filter Tabs */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200">
+        {(['All', 'Entrance Exams', 'Nursing Exams', 'Exit Exams'] as const).map(group => {
+          const isActive = selectedExamGroup === group;
+          let countText = '';
+          if (group === 'Entrance Exams') countText = `(${ENTRANCE_EXAMS.length})`;
+          if (group === 'Nursing Exams') countText = `(${NURSING_EXAMS.length})`;
+          if (group === 'Exit Exams') countText = `(${EXIT_EXAMS.length})`;
+
+          return (
+            <button
+              key={group}
+              onClick={() => {
+                setSelectedExamGroup(group);
+                setSelectedBoard('All');
+              }}
+              className={`px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-1.5 ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <span>{group === 'All' ? 'All Exam Categories' : group}</span>
+              {countText && <span className={`text-[10px] font-semibold ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>{countText}</span>}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Dynamic Board Selector Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <button
@@ -828,7 +1047,7 @@ export default function ExamBank() {
                 {boardQuestionCounts['All'] || 0} Questions
               </span>
             </div>
-            <h3 className="font-bold text-sm md:text-base">All Exam Boards</h3>
+            <h3 className="font-bold text-sm md:text-base">All Boards ({selectedExamGroup})</h3>
           </div>
           <p className={`text-[11px] mt-2 line-clamp-2 ${
             selectedBoard === 'All' ? 'text-blue-100' : 'text-slate-500'
@@ -837,7 +1056,14 @@ export default function ExamBank() {
           </p>
         </button>
 
-        {dynamicBoardCategories.map((catKey) => {
+        {dynamicBoardCategories
+          .filter(catKey => {
+            if (selectedExamGroup === 'Entrance Exams') return (ENTRANCE_EXAMS as readonly string[]).includes(catKey);
+            if (selectedExamGroup === 'Nursing Exams') return (NURSING_EXAMS as readonly string[]).includes(catKey);
+            if (selectedExamGroup === 'Exit Exams') return (EXIT_EXAMS as readonly string[]).includes(catKey);
+            return true;
+          })
+          .map((catKey) => {
           const count = boardQuestionCounts[catKey] || 0;
           return (
             <button

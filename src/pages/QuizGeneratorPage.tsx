@@ -7,7 +7,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, Layers, AlertCircle, Check, X, BookOpen
 } from 'lucide-react';
 import { QuestionData } from '@/types';
-import { ALL_QUIZ_QUESTIONS, NURSING_UNITS, NursingUnit } from '@/data/quizQuestions';
+import { ALL_QUIZ_QUESTIONS, NURSING_UNITS, NursingUnit, ALL_EXAM_TYPES, normalizeExamCategory } from '@/data/quizQuestions';
 import { collection, addDoc, getDocs, query } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useNavigate } from 'react-router-dom';
@@ -28,6 +28,7 @@ export default function QuizGeneratorPage({
   const navigate = useNavigate();
 
   // Configuration State
+  const [selectedExamMode, setSelectedExamMode] = useState<string>('All');
   const [selectedUnit, setSelectedUnit] = useState<string>(initialUnit || 'All');
   const [questionCount, setQuestionCount] = useState<number>(initialQuestionCount || 5);
   const [selectedType, setSelectedType] = useState<string>('All');
@@ -99,6 +100,13 @@ export default function QuizGeneratorPage({
   // Start Quiz Function
   const handleStartQuiz = () => {
     let filtered = [...ALL_QUIZ_QUESTIONS, ...dbQuestions];
+
+    if (selectedExamMode !== 'All') {
+      filtered = filtered.filter(q => {
+        const cat = normalizeExamCategory(q.examMode);
+        return cat === selectedExamMode || q.examMode === selectedExamMode;
+      });
+    }
 
     if (selectedUnit !== 'All') {
       filtered = filtered.filter(q => q.unitDomain === selectedUnit);
@@ -505,6 +513,40 @@ export default function QuizGeneratorPage({
 
           {/* Form Options */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Exam Board / Category Selection */}
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
+                Target Exam Category ({ALL_EXAM_TYPES.length} Types: Entrance, Nursing School & Exit Exams)
+              </label>
+              <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-200 max-h-36 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => setSelectedExamMode('All')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    selectedExamMode === 'All'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  All Exam Types
+                </button>
+                {ALL_EXAM_TYPES.map(examType => (
+                  <button
+                    key={examType}
+                    type="button"
+                    onClick={() => setSelectedExamMode(examType)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      selectedExamMode === examType
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {examType}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Unit Specialty Selection */}
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">

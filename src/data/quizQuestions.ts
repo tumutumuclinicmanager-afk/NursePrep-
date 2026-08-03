@@ -13,15 +13,76 @@ export const NURSING_UNITS = [
 
 export type NursingUnit = typeof NURSING_UNITS[number];
 
+// High-level Exam Groups per sheet
+export const ENTRANCE_EXAMS = [
+  'ATI TEAS',
+  'HESI A2',
+  'ACCUPLACER',
+  'GED',
+  'HISET'
+] as const;
+
+export const NURSING_EXAMS = [
+  'NCK',
+  'NCLEX-RN',
+  'NCLEX-PN',
+  'ATI RN',
+  'ATI LPN',
+  'HESI RN',
+  'HESI LPN',
+  'Examplify RN',
+  'Examplify LPN'
+] as const;
+
+export const EXIT_EXAMS = [
+  'ATI Exit Exam',
+  'HESI Exit Exam',
+  'Examplify Exit Exam'
+] as const;
+
+export const EXAM_GROUPS: Record<string, readonly string[]> = {
+  'Entrance Exams': ENTRANCE_EXAMS,
+  'Nursing Exams': NURSING_EXAMS,
+  'Exit Exams': EXIT_EXAMS
+};
+
+export const ALL_EXAM_TYPES = [
+  ...ENTRANCE_EXAMS,
+  ...NURSING_EXAMS,
+  ...EXIT_EXAMS
+] as const;
+
 export function normalizeExamCategory(mode?: string): string {
   if (!mode) return 'NCK';
   const m = mode.trim();
   const upper = m.toUpperCase();
-  if (upper.includes('NCK') || upper.includes('KENYA') || upper.includes('COUNCIL')) return 'NCK';
-  if (upper.includes('NCLEX') || upper.includes('NGN')) return 'NCLEX';
-  if (upper.includes('HESI')) return 'HESI';
+
+  // Entrance Exams
+  if (upper.includes('TEAS')) return 'ATI TEAS';
+  if (upper.includes('HESI A2') || upper.includes('HESI-A2')) return 'HESI A2';
+  if (upper.includes('ACCUPLACER')) return 'ACCUPLACER';
+  if (upper.includes('HISET')) return 'HISET';
   if (upper.includes('GED')) return 'GED';
-  // Preserve custom mode/category name exactly (e.g. ATI TEAS, Prometric, Midwifery)
+
+  // Exit Exams
+  if (upper.includes('ATI EXIT') || upper.includes('COMPREHENSIVE PREDICTOR')) return 'ATI Exit Exam';
+  if (upper.includes('HESI EXIT')) return 'HESI Exit Exam';
+  if (upper.includes('EXAMPLIFY EXIT')) return 'Examplify Exit Exam';
+
+  // Specific Nursing School & Board Exams
+  if (upper.includes('ATI RN')) return 'ATI RN';
+  if (upper.includes('ATI LPN') || upper.includes('ATI PN')) return 'ATI LPN';
+  if (upper.includes('HESI RN')) return 'HESI RN';
+  if (upper.includes('HESI LPN') || upper.includes('HESI PN')) return 'HESI LPN';
+  if (upper.includes('EXAMPLIFY RN')) return 'Examplify RN';
+  if (upper.includes('EXAMPLIFY LPN') || upper.includes('EXAMPLIFY PN')) return 'Examplify LPN';
+  if (upper.includes('NCK') || upper.includes('KENYA') || upper.includes('COUNCIL')) return 'NCK';
+  if (upper.includes('NCLEX-PN')) return 'NCLEX-PN';
+  if (upper.includes('NCLEX-RN') || upper.includes('NCLEX') || upper.includes('NGN')) return 'NCLEX-RN';
+  if (upper === 'ATI') return 'ATI RN';
+  if (upper === 'HESI') return 'HESI RN';
+  if (upper === 'EXAMPLIFY') return 'Examplify RN';
+
   return m;
 }
 

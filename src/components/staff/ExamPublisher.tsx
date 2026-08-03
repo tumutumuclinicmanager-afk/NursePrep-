@@ -29,14 +29,28 @@ export interface ExamDoc {
 }
 
 const DEFAULT_EXAM_TYPES = [
+  // Entrance Exams
+  'ATI TEAS',
+  'HESI A2',
+  'ACCUPLACER',
+  'GED',
+  'HISET',
+
+  // Nursing Exams
   'NCK',
   'NCLEX-RN',
   'NCLEX-PN',
-  'HESI A2',
-  'GED Prep',
-  'ATI TEAS',
-  'Prometric Nursing',
-  'Certified Nurse Educator'
+  'ATI RN',
+  'ATI LPN',
+  'HESI RN',
+  'HESI LPN',
+  'Examplify RN',
+  'Examplify LPN',
+
+  // Exit Exams
+  'ATI Exit Exam',
+  'HESI Exit Exam',
+  'Examplify Exit Exam'
 ];
 
 const DEFAULT_DOMAINS = [
@@ -210,20 +224,21 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
 
     setIsSaving(true);
     try {
+      const sanitizedPayload = JSON.parse(JSON.stringify(payload));
       if (editingExamId) {
-        await updateDoc(doc(db, 'exams', editingExamId), JSON.parse(JSON.stringify(payload)));
+        await updateDoc(doc(db, 'exams', editingExamId), sanitizedPayload);
         alert("Exam configuration successfully updated!");
       } else {
-        await addDoc(collection(db, 'exams'), JSON.parse(JSON.stringify(payload)));
+        await addDoc(collection(db, 'exams'), sanitizedPayload);
         alert(`New Exam "${title.trim()}" published under Category "${finalCategory}"!`);
       }
 
       setShowFormModal(false);
       fetchExamsAndQuestions();
       if (onExamUpdated) onExamUpdated();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving exam doc:", err);
-      alert("Failed to save exam to database.");
+      alert(`Failed to save exam to database: ${err?.message || 'Unknown database error'}`);
     } finally {
       setIsSaving(false);
     }

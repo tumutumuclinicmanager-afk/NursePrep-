@@ -13,13 +13,28 @@ import {
 } from '@/types';
 
 const DEFAULT_EXAM_MODES = [
-  'NCLEX-RN',
-  'NCLEX-PN',
+  // Entrance Exams
   'ATI TEAS',
   'HESI A2',
-  'Prometric Nursing',
-  'NCLEX Next Generation (NGN)',
-  'Certified Nurse Educator (CNE)'
+  'ACCUPLACER',
+  'GED',
+  'HISET',
+
+  // Nursing Exams
+  'NCK',
+  'NCLEX-RN',
+  'NCLEX-PN',
+  'ATI RN',
+  'ATI LPN',
+  'HESI RN',
+  'HESI LPN',
+  'Examplify RN',
+  'Examplify LPN',
+
+  // Exit Exams
+  'ATI Exit Exam',
+  'HESI Exit Exam',
+  'Examplify Exit Exam'
 ];
 
 const DEFAULT_UNITS = [

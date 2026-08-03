@@ -98,9 +98,9 @@ export default function UploadExams() {
       setUploadStatus('idle');
       setExamTitle('');
       setRefreshRepoTrigger(prev => prev + 1);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving exam:', error);
-      alert('Failed to save exam to database.');
+      alert(`Failed to save exam to database: ${error?.message || 'Unknown database error'}`);
     } finally {
       setIsSaving(false);
     }
