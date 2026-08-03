@@ -67,6 +67,8 @@ const DEFAULT_DOMAINS = [
 export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () => void }) {
   const [exams, setExams] = useState<ExamDoc[]>([]);
   const [availableQuestions, setAvailableQuestions] = useState<QuestionData[]>([]);
+  const [customExamModes, setCustomExamModes] = useState<any[]>([]);
+  const [newExamModeName, setNewExamModeName] = useState('');
   const [loading, setLoading] = useState(true);
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingExamId, setEditingExamId] = useState<string | null>(null);
@@ -110,6 +112,15 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
       }));
       setAvailableQuestions(qList);
 
+      // 3. Fetch Exam Modes
+      try {
+        const modesSnap = await getDocs(query(collection(db, 'exam_modes')));
+        const modesList = modesSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        setCustomExamModes(modesList);
+      } catch (e) {
+        console.warn("Error fetching exam modes:", e);
+      }
+
     } catch (err) {
       console.error("Error fetching exams in publisher:", err);
     } finally {
@@ -120,6 +131,39 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
   useEffect(() => {
     fetchExamsAndQuestions();
   }, []);
+
+  const handleAddExamMode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newExamModeName.trim()) return;
+    try {
+      await addDoc(collection(db, 'exam_modes'), { 
+        name: newExamModeName.trim(), 
+        createdAt: new Date().toISOString() 
+      });
+      setNewExamModeName('');
+      fetchExamsAndQuestions();
+      alert('New Exam Mode added successfully!');
+    } catch (err) {
+      console.error('Error adding exam mode:', err);
+      alert('Failed to add exam mode.');
+    }
+  };
+
+  const handleDeleteExamMode = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this custom exam mode?")) return;
+    try {
+      await deleteDoc(doc(db, 'exam_modes', id));
+      fetchExamsAndQuestions();
+    } catch (err) {
+      console.error('Error deleting exam mode:', err);
+      alert('Failed to delete exam mode.');
+    }
+  };
+
+  const ALL_COMBINED_EXAM_TYPES = [
+    ...DEFAULT_EXAM_TYPES,
+    ...customExamModes.map(m => m.name)
+  ];
 
   const handleOpenCreateModal = () => {
     setEditingExamId(null);
@@ -143,7 +187,7 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
     setEditingExamId(exam.id || null);
     setTitle(exam.title || '');
     
-    if (DEFAULT_EXAM_TYPES.includes(exam.category)) {
+    if (DEFAULT_EXAM_TYPES.includes(exam.category) || customExamModes.some(m => m.name === exam.category)) {
       setCategory(exam.category);
       setCustomCategory('');
     } else {
@@ -290,6 +334,61 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
           <Plus className="w-4 h-4" />
           Create New Exam / Exam Type
         </Button>
+      </div>
+
+      {/* Exam Modes Management Card */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+              <Layers className="w-5 h-5 text-blue-600" />
+              Manage Exam Modes ({ALL_COMBINED_EXAM_TYPES.length})
+            </h3>
+            <p className="text-slate-500 text-xs">Add new exam modes or delete custom exam modes available across the system.</p>
+          </div>
+          <form onSubmit={handleAddExamMode} className="flex items-center gap-2">
+            <input 
+              type="text"
+              value={newExamModeName}
+              onChange={(e) => setNewExamModeName(e.target.value)}
+              placeholder="New Exam Mode (e.g., NCLEX-RN Advanced)"
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-1 focus:ring-blue-500 w-60"
+            />
+            <Button type="submit" size="sm" className="bg-blue-600 text-white text-xs gap-1">
+              <Plus className="w-3.5 h-3.5" /> Add Mode
+            </Button>
+          </form>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-2">
+          {ALL_COMBINED_EXAM_TYPES.map((mode) => {
+            const isCustom = customExamModes.some(m => m.name === mode);
+            const customObj = customExamModes.find(m => m.name === mode);
+            return (
+              <div 
+                key={mode}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-2 ${
+                  isCustom ? 'bg-blue-50 text-blue-900 border-blue-200' : 'bg-slate-50 text-slate-700 border-slate-200'
+                }`}
+              >
+                <span>{mode}</span>
+                {isCustom && customObj && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteExamMode(customObj.id)}
+                    className="text-rose-500 hover:text-rose-700 p-0.5 rounded"
+                    title="Delete Custom Exam Mode"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {!isCustom && (
+                  <span className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Default</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Main List of Exams */}
@@ -448,7 +547,7 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
                   >
-                    {DEFAULT_EXAM_TYPES.map(cat => (
+                    {ALL_COMBINED_EXAM_TYPES.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                     <option value="CUSTOM">+ Add New Custom Exam Type...</option>

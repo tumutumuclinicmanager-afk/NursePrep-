@@ -212,8 +212,11 @@ export default function QuestionRepository({ refreshTrigger }: { refreshTrigger?
         {/* Mode Breakdown Pills */}
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200">
           <span className="text-xs font-bold text-slate-500">Repository Question Count Breakdown:</span>
-          {['NCLEX', 'NCK', 'HESI', 'GED'].map(mode => {
-            const count = questions.filter(q => (q.examMode || '').toUpperCase().includes(mode)).length;
+          {Array.from(new Set([
+            ...DEFAULT_EXAM_MODES,
+            ...questions.map(q => q.examMode).filter(Boolean)
+          ])).map(mode => {
+            const count = questions.filter(q => (q.examMode || '').toLowerCase() === (mode || '').toLowerCase()).length;
             return (
               <span key={mode} className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                 <span>{mode}:</span>

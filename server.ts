@@ -229,7 +229,45 @@ Key guidelines:
       }
       
       const apiKey = process.env.GEMINI_API_KEY;
-      let questions = [];
+      let questions: any[] = [];
+
+      // Helper regex fallback parser to extract all questions from PDF text
+      const fallbackRegexExtract = (rawText: string) => {
+        const extracted = [];
+        const regex = /(?:(?:Question|Q\.?)\s*(\d+)[\.:]?\s*|\b(\d+)\.\s+)([\s\S]*?)(?=(?:(?:Question|Q\.?)\s*\d+[\.:]?|\b\d+\.\s+)|$)/gi;
+        let match;
+        while ((match = regex.exec(rawText)) !== null) {
+          const qNum = match[1] || match[2];
+          const qBody = match[3];
+          if (!qBody || qBody.length < 10) continue;
+
+          const optionMatches = qBody.match(/(?:[A-Da-d][\.\)]\s*)([^\n]+)/g);
+          let options = [];
+          if (optionMatches && optionMatches.length >= 2) {
+            options = optionMatches.map(o => o.replace(/^[A-Da-d][\.\)]\s*/, '').trim());
+          } else {
+            options = ["Option A", "Option B", "Option C", "Option D"];
+          }
+
+          let questionStem = qBody;
+          if (optionMatches && optionMatches[0]) {
+            const idx = qBody.indexOf(optionMatches[0]);
+            if (idx > 0) {
+              questionStem = qBody.substring(0, idx).trim();
+            }
+          }
+
+          extracted.push({
+            question: questionStem.replace(/^[\d\.\)]+\s*/, '').trim() || `Question ${qNum || extracted.length + 1}`,
+            options: options.length >= 4 ? options.slice(0, 4) : [...options, "Option C", "Option D"].slice(0, 4),
+            correctAnswer: options[0] || "Option A",
+            explanation: "Extracted from uploaded PDF document.",
+            category: "Nursing Exam",
+            difficulty: "Medium"
+          });
+        }
+        return extracted;
+      };
 
       if (apiKey && apiKey !== "dummy_key") {
         try {
@@ -241,7 +279,7 @@ Key guidelines:
               }
             }
           });
-          const prompt = `Extract nursing exam questions from the following text (e.g. Saunders NCLEX Q&A style). 
+          const prompt = `Extract ALL nursing exam questions present in the following text (e.g. Saunders NCLEX Q&A style). Do not truncate, omit, or summarize. Extract every single question from start to finish.
           Return ONLY a JSON array of objects, where each object has:
           "question" (string), 
           "options" (array of 4 strings), 
@@ -249,7 +287,7 @@ Key guidelines:
           "explanation" (string), 
           "category" (string),
           "difficulty" (string).
-          Text: ${text.substring(0, 10000)}...
+          Text: ${text.substring(0, 100000)}
           Do not include markdown blocks like \`\`\`json. Just the array.`;
           
           const response = await ai.models.generateContent({
@@ -261,13 +299,21 @@ Key guidelines:
           });
           
           const questionsText = response.text;
-          questions = JSON.parse(questionsText || "[]");
+          const parsed = JSON.parse(questionsText || "[]");
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            questions = parsed;
+          }
         } catch (aiErr) {
-          console.warn("Gemini extraction error in upload-exam, falling back to structured extraction:", aiErr);
+          console.warn("Gemini extraction error in upload-exam, falling back to regex extraction:", aiErr);
         }
       }
 
-      // Fallback if AI extraction returned empty or failed
+      // If AI extraction returned empty or failed, use regex parser on full text
+      if (!Array.isArray(questions) || questions.length === 0) {
+        questions = fallbackRegexExtract(text);
+      }
+
+      // Ultimate fallback if text had no match
       if (!Array.isArray(questions) || questions.length === 0) {
         questions = [
           {
