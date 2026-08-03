@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Layers, ShieldCheck, Lock, Eye, EyeOff, Edit, Trash2, 
-  CheckCircle2, AlertCircle, RefreshCw, BookOpen, Sparkles, Filter, 
+  CheckCircle2, AlertCircle, RefreshCw, BookOpen, Filter, 
   Save, X, HelpCircle, ArrowRight, Zap, Award 
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';

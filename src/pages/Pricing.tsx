@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DollarSign, CheckCircle2, ChevronRight, ShieldCheck, Award, Zap, CreditCard, Smartphone, Lock, Sparkles, RefreshCw, Star, Check, X, Globe, BookOpen } from 'lucide-react';
+import { DollarSign, CheckCircle2, ChevronRight, ShieldCheck, Award, Zap, CreditCard, Smartphone, Lock, RefreshCw, Star, Check, X, Globe, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { collection, addDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';

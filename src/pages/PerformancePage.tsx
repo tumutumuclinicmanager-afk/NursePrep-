@@ -1,31 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  BarChart2, 
-  Target, 
-  Award, 
-  BookOpen, 
-  Flame, 
-  ShieldCheck, 
-  Stethoscope, 
-  Heart, 
-  Sparkles, 
-  Pill, 
-  Brain, 
-  Users, 
-  Zap, 
-  CheckCircle2, 
-  ChevronRight, 
-  Star, 
-  Clock, 
-  Filter, 
-  Lock, 
-  RotateCcw,
-  TrendingUp,
-  X,
-  Shield,
-  Activity
-} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
@@ -36,20 +10,19 @@ import {
   calculateUserStreak, 
   evaluateUserBadges, 
   BadgeConfig, 
-  UserBadgeState, 
-  ICON_MAP 
+  UserBadgeState 
 } from '@/lib/badges';
 
-// Unit themes mapping for visual icons and badges
-const UNIT_THEMES: Record<string, { icon: any; color: string; bg: string; border: string; bar: string }> = {
-  'Medical-Surgical Nursing': { icon: Stethoscope, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200', bar: 'bg-rose-500' },
-  'Maternal & Newborn Health': { icon: Heart, color: 'text-pink-600', bg: 'bg-pink-50', border: 'border-pink-200', bar: 'bg-pink-500' },
-  'Pediatric Nursing': { icon: Sparkles, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', bar: 'bg-amber-500' },
-  'Pharmacology & Parenteral Therapies': { icon: Pill, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: 'bg-emerald-500' },
-  'Psychiatric & Mental Health': { icon: Brain, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200', bar: 'bg-purple-500' },
-  'Community & Public Health': { icon: Users, color: 'text-teal-600', bg: 'bg-teal-50', border: 'border-teal-200', bar: 'bg-teal-500' },
-  'Nursing Fundamentals & Leadership': { icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', bar: 'bg-blue-500' },
-  'Critical Care & Emergency Nursing': { icon: Zap, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200', bar: 'bg-orange-500' },
+// Unit themes mapping for visual styling
+const UNIT_THEMES: Record<string, { color: string; bg: string; border: string; bar: string }> = {
+  'Medical-Surgical Nursing': { color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200', bar: 'bg-rose-500' },
+  'Maternal & Newborn Health': { color: 'text-pink-600', bg: 'bg-pink-50', border: 'border-pink-200', bar: 'bg-pink-500' },
+  'Pediatric Nursing': { color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', bar: 'bg-amber-500' },
+  'Pharmacology & Parenteral Therapies': { color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: 'bg-emerald-500' },
+  'Psychiatric & Mental Health': { color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200', bar: 'bg-purple-500' },
+  'Community & Public Health': { color: 'text-teal-600', bg: 'bg-teal-50', border: 'border-teal-200', bar: 'bg-teal-500' },
+  'Nursing Fundamentals & Leadership': { color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', bar: 'bg-blue-500' },
+  'Critical Care & Emergency Nursing': { color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200', bar: 'bg-orange-500' },
 };
 
 export default function PerformancePage() {
@@ -163,7 +136,7 @@ export default function PerformancePage() {
       else status = 'Needs Review';
     }
 
-    const theme = UNIT_THEMES[unitName] || { icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', bar: 'bg-blue-500' };
+    const theme = UNIT_THEMES[unitName] || { color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', bar: 'bg-blue-500' };
 
     return {
       unitName,
@@ -212,8 +185,7 @@ export default function PerformancePage() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <BarChart2 className="w-7 h-7 text-blue-600" />
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
             Performance & Mastery Analytics
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -223,27 +195,23 @@ export default function PerformancePage() {
         <div className="flex items-center gap-3">
           <Button 
             onClick={() => { setSelectedUnit('All'); setShowQuizModal(true); }}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 shadow-sm rounded-xl flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 shadow-sm rounded-xl"
           >
-            <Zap className="w-4 h-4 fill-white" />
             Generate Practice Test
           </Button>
         </div>
       </div>
 
       {/* Overall NCLEX Mastery & Readiness Hero Gauge Card */}
-      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-950 text-white rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden border border-slate-800">
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-56 h-56 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        
+      <div className="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-md border border-slate-800 relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
           <div className="space-y-4 flex-1">
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className={`text-xs px-3.5 py-1 rounded-full border shadow-2xs ${readinessBadge.color}`}>
                 {readinessBadge.label}
               </span>
-              <span className="text-xs font-semibold text-slate-300 bg-white/10 px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" /> Saunders NCLEX-RN Standard
+              <span className="text-xs font-semibold text-slate-300 bg-white/10 px-3 py-1 rounded-full border border-white/10">
+                Saunders NCLEX-RN Standard
               </span>
             </div>
 
@@ -309,8 +277,7 @@ export default function PerformancePage() {
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
-            <h2 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-              <Target className="w-5 h-5 text-blue-600" />
+            <h2 className="font-bold text-slate-900 text-lg">
               Questions Attempted & Mastery Per Unit
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -326,8 +293,6 @@ export default function PerformancePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5">
           {unitMetrics.map((unit, idx) => {
-            const IconComp = unit.theme.icon;
-            
             let statusStyle = 'bg-slate-100 text-slate-600 border-slate-200';
             if (unit.status === 'Mastered') statusStyle = 'bg-emerald-100 text-emerald-800 border-emerald-300';
             else if (unit.status === 'Proficient') statusStyle = 'bg-blue-100 text-blue-800 border-blue-300';
@@ -340,20 +305,15 @@ export default function PerformancePage() {
                 className="p-5 rounded-2xl border border-slate-200 hover:border-blue-300 hover:shadow-sm transition-all bg-white flex flex-col justify-between space-y-4"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3.5">
-                    <div className={`w-11 h-11 rounded-xl ${unit.theme.bg} ${unit.theme.color} flex items-center justify-center shrink-0 border ${unit.theme.border} shadow-2xs`}>
-                      <IconComp className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-sm leading-snug">{unit.unitName}</h3>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${statusStyle}`}>
-                          {unit.status}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-500">
-                          {unit.attempted} Attempted
-                        </span>
-                      </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm leading-snug">{unit.unitName}</h3>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${statusStyle}`}>
+                        {unit.status}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {unit.attempted} Attempted
+                      </span>
                     </div>
                   </div>
 
@@ -385,10 +345,9 @@ export default function PerformancePage() {
                 {/* Action Button */}
                 <button
                   onClick={() => handleLaunchUnitQuiz(unit.unitName)}
-                  className="w-full py-2 px-4 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2 px-4 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 rounded-xl text-xs font-bold transition-colors text-center"
                 >
-                  <span>Practice {unit.unitName.split(' ')[0]} Questions</span>
-                  <ChevronRight className="w-4 h-4" />
+                  Practice {unit.unitName.split(' ')[0]} Questions
                 </button>
               </div>
             );
@@ -400,8 +359,7 @@ export default function PerformancePage() {
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
-            <h2 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-500" />
+            <h2 className="font-bold text-slate-900 text-lg">
               Badges & Achievements ({unlockedBadgesCount} / {evaluatedBadges.length} Attained)
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -439,35 +397,25 @@ export default function PerformancePage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredBadges.map((badge) => {
-            const IconComponent = ICON_MAP[badge.icon] || Award;
-
             return (
               <div 
                 key={badge.id} 
-                className={`p-4 rounded-xl border transition-all flex items-start gap-3.5 relative overflow-hidden ${
+                className={`p-4 rounded-xl border transition-all relative overflow-hidden ${
                   badge.unlocked 
                     ? `${badge.bg} border-slate-200 shadow-2xs` 
                     : 'bg-slate-50/80 border-slate-200 opacity-60'
                 }`}
               >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border ${
-                  badge.unlocked ? 'bg-white shadow-2xs' : 'bg-slate-200/60 border-slate-300'
-                }`}>
-                  {badge.unlocked ? (
-                    <IconComponent className={`w-6 h-6 ${badge.color}`} />
-                  ) : (
-                    <Lock className="w-5 h-5 text-slate-400" />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0 space-y-1">
+                <div className="space-y-1">
                   <div className="flex items-center justify-between gap-1">
                     <h3 className="font-bold text-xs text-slate-900 truncate">{badge.name}</h3>
-                    {badge.unlocked && (
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full shrink-0">
-                        Unlocked
-                      </span>
-                    )}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                      badge.unlocked 
+                        ? 'text-emerald-700 bg-emerald-100' 
+                        : 'text-slate-500 bg-slate-200'
+                    }`}>
+                      {badge.unlocked ? 'Unlocked' : 'Locked'}
+                    </span>
                   </div>
                   
                   <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">
@@ -496,8 +444,7 @@ export default function PerformancePage() {
       {/* Historical Quiz Logs */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
-            <Clock className="w-5 h-5 text-blue-600" />
+          <h2 className="font-bold text-slate-900 text-base">
             Recent Quiz Performance History
           </h2>
           <span className="text-xs text-slate-500">Total Attempts: {history.length}</span>
@@ -512,16 +459,11 @@ export default function PerformancePage() {
           <div className="divide-y divide-slate-100 overflow-x-auto">
             {history.slice(0, 10).map((item, idx) => (
               <div key={idx} className="py-3 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900">{item.title || 'NCLEX Practice Quiz'}</h3>
-                    <p className="text-[11px] text-slate-500">
-                      {item.timestamp ? new Date(item.timestamp).toLocaleDateString() : 'Recent'} &bull; {item.totalQuestions || 0} Questions
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">{item.title || 'NCLEX Practice Quiz'}</h3>
+                  <p className="text-[11px] text-slate-500">
+                    {item.timestamp ? new Date(item.timestamp).toLocaleDateString() : 'Recent'} &bull; {item.totalQuestions || 0} Questions
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -545,9 +487,9 @@ export default function PerformancePage() {
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative border border-slate-200">
             <button
               onClick={() => setShowQuizModal(false)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+              className="absolute top-4 right-4 text-xs font-bold text-slate-500 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-slate-100"
             >
-              <X className="w-5 h-5" />
+              Close ✕
             </button>
 
             <div className="mb-4">

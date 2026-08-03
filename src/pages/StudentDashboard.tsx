@@ -18,7 +18,6 @@ import {
   ChevronRight, 
   ShieldCheck,
   BarChart2,
-  Sparkles,
   ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -157,7 +156,7 @@ export default function StudentDashboard() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-blue-950 via-indigo-900 to-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-lg relative overflow-hidden border border-blue-900">
+      <div className="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-md relative overflow-hidden border border-slate-800">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -172,7 +171,7 @@ export default function StudentDashboard() {
               Welcome back to your NCLEX Command Center
             </h1>
             <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
-              Complete practice questions, generate custom AI study quizzes, and review your dedicated unit-by-unit performance metrics.
+              Complete practice questions, generate custom study quizzes, and review your dedicated unit-by-unit performance metrics.
             </p>
           </div>
 
@@ -346,25 +345,25 @@ export default function StudentDashboard() {
 
       </div>
 
-      {/* AI Assistant Quick Launcher Banner */}
-      <div className="bg-gradient-to-r from-indigo-50 via-blue-50 to-purple-50 rounded-2xl border border-indigo-100 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* Clinical Study Assistant Quick Launcher Banner */}
+      <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-white shadow-md">
         <div className="flex items-start gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-            <Sparkles className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+            <BookOpen className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-900 text-sm">Need Clinical Rationale & Saunders Study Mentoring?</h3>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Ask NursePrep AI study assistant for memory mnemonics, NCLEX pharmacology breakdowns, or flashcards.
+            <h3 className="font-bold text-white text-sm">Need Clinical Rationale & Saunders Study Mentoring?</h3>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Access clinical study assistant for memory mnemonics, NCLEX pharmacology breakdowns, and Saunders flashcards.
             </p>
           </div>
         </div>
 
         <Button
           onClick={() => navigate('/dashboard/assistant')}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 shadow-xs"
+          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 shadow-xs"
         >
-          Ask AI Study Assistant
+          Launch Study Assistant
         </Button>
       </div>
 

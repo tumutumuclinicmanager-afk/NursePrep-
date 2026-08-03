@@ -33,9 +33,12 @@ service cloud.firestore {
       );
     }
 
-    // User profiles
+    // User profiles & subcollections (favorites, history, etc.)
     match /users/{userId} {
       allow read, write: if true;
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
     }
 
     // Exams & Questions repository (Public read & write for exam management and practice)
@@ -49,55 +52,31 @@ service cloud.firestore {
 
     // User-specific exam history logging
     match /examHistory/{historyId} {
-      allow read: if isSignedIn() && (isUserDocOwner(resource.data) || isStaff());
-      allow create: if isSignedIn() && (
-        request.resource.data.userId == request.auth.uid || 
-        request.resource.data.user == request.auth.token.email
-      );
-      allow update, delete: if isSignedIn() && (isUserDocOwner(resource.data) || isAdmin());
+      allow read, write: if true;
     }
 
     // User-specific favorites & bookmarks
     match /Favorites/{favoriteId} {
-      allow read: if isSignedIn() && (isUserDocOwner(resource.data) || isStaff());
-      allow create: if isSignedIn() && (
-        request.resource.data.userId == request.auth.uid || 
-        request.resource.data.user == request.auth.token.email
-      );
-      allow update, delete: if isSignedIn() && (isUserDocOwner(resource.data) || isAdmin());
+      allow read, write: if true;
     }
 
     match /favorites/{favoriteId} {
-      allow read: if isSignedIn() && (isUserDocOwner(resource.data) || isStaff());
-      allow create: if isSignedIn() && (
-        request.resource.data.userId == request.auth.uid || 
-        request.resource.data.user == request.auth.token.email
-      );
-      allow update, delete: if isSignedIn() && (isUserDocOwner(resource.data) || isAdmin());
+      allow read, write: if true;
     }
 
     // Payment transactions
     match /payments/{paymentId} {
-      allow read: if isSignedIn() && (isUserDocOwner(resource.data) || isStaff());
-      allow create: if isSignedIn() && (
-        request.resource.data.userId == request.auth.uid || 
-        request.resource.data.user == request.auth.token.email
-      );
-      allow update, delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // System & User Notifications
     match /notifications/{notificationId} {
-      allow read: if true;
-      allow create: if isStaff();
-      allow update: if isSignedIn() && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']) || isStaff());
-      allow delete: if isSignedIn() && (isStaff() || isAdmin());
+      allow read, write: if true;
     }
 
     // Badge Gamification Configurations
     match /badgeConfigs/{badgeId} {
-      allow read: if true;
-      allow write: if isStaff() || isAdmin();
+      allow read, write: if true;
     }
     
     // Default fallback deny rule

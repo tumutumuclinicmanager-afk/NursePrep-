@@ -5,7 +5,7 @@ import {
   Search, Filter, BookOpen, Activity, HeartPulse, Brain, Baby, 
   ArrowRight, DollarSign, ShoppingCart, Folder, FolderOpen, 
   ChevronRight, ChevronDown, ChevronLeft, Clock, HelpCircle, CheckCircle, 
-  Award, Grid, List, Play, Tag, Layers, RefreshCw, X, AlertCircle, Database, Sparkles,
+  Award, Grid, List, Play, Tag, Layers, RefreshCw, X, AlertCircle, Database,
   Bookmark, BookmarkCheck, Trash2, Star, Lock, Crown, ShieldCheck
 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, getDoc } from 'firebase/firestore';
@@ -430,6 +430,7 @@ export default function ExamBank() {
   
   // State for student subscription
   const [userSubscriptionPlan, setUserSubscriptionPlan] = useState<'free' | 'basic' | 'gold' | 'platinum'>('free');
+  const [selectedPlanFilter, setSelectedPlanFilter] = useState<'All' | 'My Plan Access' | 'free' | 'basic' | 'gold' | 'platinum'>('All');
   const [requiredPlanModalExam, setRequiredPlanModalExam] = useState<ExamItem | null>(null);
   const [practiceLimitInfo, setPracticeLimitInfo] = useState<{ limit: number; total: number } | null>(null);
 
@@ -799,12 +800,25 @@ export default function ExamBank() {
     const matchesBoard = selectedBoard === 'All' || exam.category === selectedBoard;
     const matchesDomain = selectedDomain === 'All Specialties' || exam.domain === selectedDomain;
     const matchesDifficulty = selectedDifficulty === 'All' || exam.difficulty === selectedDifficulty;
+    
+    // Subscription Plan Filter
+    const reqPlan = (exam.requiredPlan || 'free').toLowerCase();
+    const reqLevel = PLAN_LEVELS[reqPlan] || 1;
+    const userLevel = PLAN_LEVELS[userSubscriptionPlan] || 1;
+
+    let matchesPlanFilter = true;
+    if (selectedPlanFilter === 'My Plan Access') {
+      matchesPlanFilter = reqLevel <= userLevel;
+    } else if (selectedPlanFilter !== 'All') {
+      matchesPlanFilter = reqPlan === selectedPlanFilter;
+    }
+
     const matchesQuery = searchQuery === '' || 
       exam.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
       exam.domain.toLowerCase().includes(searchQuery.toLowerCase()) ||
       exam.category.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesGroup && matchesBoard && matchesDomain && matchesDifficulty && matchesQuery;
+    return matchesGroup && matchesBoard && matchesDomain && matchesDifficulty && matchesPlanFilter && matchesQuery;
   });
 
   // Group filtered exams dynamically by Board Category
@@ -959,6 +973,30 @@ export default function ExamBank() {
             <span className="px-3 py-1 rounded-full font-extrabold bg-blue-500 text-white uppercase tracking-wider">
               {userSubscriptionPlan.toUpperCase()} PLAN
             </span>
+            <span className="text-slate-500 hidden sm:inline">|</span>
+            <span className="text-slate-300 font-medium">Filter by Access Plan:</span>
+            <div className="inline-flex flex-wrap items-center gap-1.5 p-1 bg-slate-800/80 rounded-lg border border-slate-700">
+              {[
+                { label: 'All Plans', val: 'All' },
+                { label: `My Plan (${userSubscriptionPlan.toUpperCase()})`, val: 'My Plan Access' },
+                { label: 'Free Tier', val: 'free' },
+                { label: 'Basic', val: 'basic' },
+                { label: 'Gold', val: 'gold' },
+                { label: 'Platinum', val: 'platinum' }
+              ].map(item => (
+                <button
+                  key={item.val}
+                  onClick={() => setSelectedPlanFilter(item.val as any)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                    selectedPlanFilter === item.val
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -973,7 +1011,7 @@ export default function ExamBank() {
             <div className="flex items-center gap-2">
               <h2 className="text-base font-extrabold text-slate-900">Actual Question Bank Inventory</h2>
               <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> Live Tracking
+                <Activity className="w-3 h-3" /> Live Tracking
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -1128,6 +1166,22 @@ export default function ExamBank() {
           {/* Difficulty & View Switcher */}
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
             <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Plan Tier:</span>
+              <select
+                value={selectedPlanFilter}
+                onChange={(e) => setSelectedPlanFilter(e.target.value as any)}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="All">All Plan Tiers</option>
+                <option value="My Plan Access">Accessible with My Plan ({userSubscriptionPlan.toUpperCase()})</option>
+                <option value="free">Free Access Tier</option>
+                <option value="basic">Basic / Silver Tier</option>
+                <option value="gold">Gold / Pass Tier</option>
+                <option value="platinum">Platinum / Master Tier</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Difficulty:</span>
               <select
                 value={selectedDifficulty}
@@ -1182,6 +1236,7 @@ export default function ExamBank() {
                   setSelectedBoard('All');
                   setSelectedDomain('All Specialties');
                   setSelectedDifficulty('All');
+                  setSelectedPlanFilter('All');
                   setSearchQuery('');
                 }}
               >

@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { 
   BookOpen, Brain, Activity, Clock, CheckCircle, Clock3, AlertCircle, 
-  Search, Play, ArrowRight, ShieldCheck, Layers, Sparkles, RefreshCw, 
+  Search, Play, ArrowRight, ShieldCheck, Layers, RefreshCw, 
   HelpCircle, ChevronRight, ChevronLeft, Award, Plus, FolderCheck, Lock, Unlock, FileText
 } from 'lucide-react';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
@@ -458,10 +458,10 @@ export default function MyCourses() {
                       <Button 
                         variant="outline"
                         onClick={() => navigate('/dashboard/assistant')}
-                        title="Ask AI Tutor"
-                        className="text-purple-600 border-purple-200 hover:bg-purple-50 text-xs px-2.5"
+                        title="Study Assistant"
+                        className="text-blue-700 border-blue-200 hover:bg-blue-50 text-xs px-2.5"
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
+                        <BookOpen className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   ) : (

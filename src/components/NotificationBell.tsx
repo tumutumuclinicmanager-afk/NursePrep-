@@ -6,7 +6,7 @@ import {
   Trash2, 
   BookOpen, 
   CreditCard, 
-  Sparkles, 
+  Award, 
   Clock, 
   X, 
   ExternalLink,
@@ -215,7 +215,7 @@ export function NotificationBell({ userRole = 'student' }: { userRole?: string }
       case 'payment':
         return <CreditCard className="w-4 h-4 text-emerald-600" />;
       case 'study':
-        return <Sparkles className="w-4 h-4 text-amber-500" />;
+        return <Award className="w-4 h-4 text-amber-500" />;
       default:
         return <GraduationCap className="w-4 h-4 text-indigo-600" />;
     }

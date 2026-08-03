@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Plus, Trash2, CheckCircle2, Image, FileText, Layers, Settings, 
   HelpCircle, ListChecks, ArrowUpDown, Hash, MoveVertical, Grid, 
-  Tag, BookOpen, Sparkles, Save, Check, X, Info, PlusCircle, AlertCircle
+  Tag, BookOpen, Save, Check, X, Info, PlusCircle, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { collection, addDoc } from 'firebase/firestore';

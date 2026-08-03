@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrainCircuit, Send, Sparkles, RefreshCw, Copy, Check, BookOpen, Lightbulb, HelpCircle, Layers, Maximize2, Minimize2, AlertCircle } from 'lucide-react';
+import { BrainCircuit, Send, RefreshCw, Copy, Check, BookOpen, Lightbulb, HelpCircle, Layers, Maximize2, Minimize2, AlertCircle } from 'lucide-react';
 import { NURSING_UNITS } from '@/data/quizQuestions';
 import { sanitizeInput } from '@/lib/security';
 import { GoogleGenAI } from '@google/genai';
@@ -30,7 +30,7 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
     {
       id: 'init-1',
       role: 'assistant',
-      text: "Hello! I am **NursePrep AI**, your personal NCLEX-RN study assistant and clinical mentor. Ask me any nursing question, prompt me for a memory mnemonic, or ask for flashcards on any topic!",
+      text: "Hello! I am your **NCLEX-RN Clinical Study Assistant**. Ask me any nursing question, prompt me for a memory mnemonic, or ask for flashcards on any topic!",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -339,7 +339,7 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
         {/* Mode Selectors */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           {[
-            { id: 'general', label: 'Clinical QA', icon: Sparkles },
+            { id: 'general', label: 'Clinical QA', icon: BrainCircuit },
             { id: 'mnemonic', label: 'Mnemonics', icon: Lightbulb },
             { id: 'flashcards', label: 'Flashcards', icon: BookOpen },
             { id: 'rationale', label: 'Rationale', icon: HelpCircle },
@@ -430,8 +430,8 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
         {isLoading && (
           <div className="flex items-start gap-2">
             <div className="bg-slate-800/90 border border-slate-700/80 text-slate-300 p-3 rounded-xl rounded-bl-xs text-xs flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-400 animate-spin" />
-              <span className="italic text-slate-400">NursePrep AI is generating nursing insights...</span>
+              <RefreshCw className="w-4 h-4 text-emerald-400 animate-spin" />
+              <span className="italic text-slate-400">Retrieving clinical nursing insights...</span>
             </div>
           </div>
         )}

@@ -1,24 +1,23 @@
 import React from 'react';
 import { StudyAssistant } from '@/components/StudyAssistant';
-import { BrainCircuit, Sparkles, BookOpen, Target, Lightbulb, ShieldCheck } from 'lucide-react';
+import { BrainCircuit, BookOpen, Target, Lightbulb, ShieldCheck } from 'lucide-react';
 
 export default function StudyAssistantPage() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 p-6 rounded-2xl border border-slate-800 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-1/4 -translate-y-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-white shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
-              <Sparkles className="w-4 h-4" />
-              <span>NCLEX-RN Next-Gen AI Tutor</span>
+              <BookOpen className="w-4 h-4" />
+              <span>NCLEX-RN Next-Gen Clinical Assistant</span>
             </div>
             <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-              Smart AI Study Assistant
+              Clinical Study Assistant
             </h1>
             <p className="text-slate-300 text-xs max-w-2xl leading-relaxed">
-              Powered by Gemini 3.6 Flash. Ask complex clinical nursing questions, generate custom NCLEX study flashcards, request memory mnemonics, or review Saunders-aligned rationale breakdowns.
+              Ask complex clinical nursing questions, generate custom NCLEX study flashcards, request memory mnemonics, or review Saunders-aligned rationale breakdowns.
             </p>
           </div>
 
@@ -45,7 +44,7 @@ export default function StudyAssistantPage() {
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
               <Lightbulb className="w-4 h-4 text-amber-500" />
-              How to Prompt Your AI Tutor
+              How to Prompt Your Study Mentor
             </h3>
 
             <div className="space-y-3 text-xs text-slate-600">

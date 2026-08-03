@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { 
   BrainCircuit, Play, Clock, CheckCircle, HelpCircle, 
-  Award, ArrowRight, RotateCcw, Sparkles, Filter, ChevronUp, 
+  Award, ArrowRight, RotateCcw, Filter, ChevronUp, 
   ChevronDown, ChevronLeft, ChevronRight, Layers, AlertCircle, Check, X, BookOpen
 } from 'lucide-react';
 import { QuestionData } from '@/types';
@@ -685,15 +685,15 @@ export default function QuizGeneratorPage({
 
           {/* Launch Button */}
           <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs text-slate-500 flex items-center gap-1">
-              <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+            <div className="text-xs text-slate-500 flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-blue-600 shrink-0" />
               <span>Includes board questions with rationales and dosage math.</span>
             </div>
             <Button
               onClick={handleStartQuiz}
               className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl gap-2 shadow-lg shadow-blue-500/20"
             >
-              <Play className="w-4 h-4 fill-white" /> Launch Smart Practice Quiz
+              <Play className="w-4 h-4 fill-white" /> Launch Practice Quiz
             </Button>
           </div>
         </div>
