@@ -290,21 +290,35 @@ Key guidelines:
           Text: ${text.substring(0, 100000)}
           Do not include markdown blocks like \`\`\`json. Just the array.`;
           
-          const response = await ai.models.generateContent({
-            model: "gemini-3.6-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json"
-            }
-          });
+          let response;
+          try {
+            response = await ai.models.generateContent({
+              model: "gemini-3.6-flash",
+              contents: prompt,
+              config: {
+                  responseMimeType: "application/json"
+              }
+            });
+          } catch (modelErr: any) {
+            // Try fallback model if 503 / unavailable
+            response = await ai.models.generateContent({
+              model: "gemini-flash-latest",
+              contents: prompt,
+              config: {
+                  responseMimeType: "application/json"
+              }
+            });
+          }
           
           const questionsText = response.text;
           const parsed = JSON.parse(questionsText || "[]");
           if (Array.isArray(parsed) && parsed.length > 0) {
             questions = parsed;
           }
-        } catch (aiErr) {
-          console.warn("Gemini extraction error in upload-exam, falling back to regex extraction:", aiErr);
+        } catch (aiErr: any) {
+          if (!String(aiErr?.message || '').includes('503')) {
+            console.warn("Gemini extraction error in upload-exam, falling back to regex extraction:", aiErr?.message || aiErr);
+          }
         }
       }
 
