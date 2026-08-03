@@ -27,6 +27,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import QuizGeneratorPage from './pages/QuizGeneratorPage';
 import StudyAssistantPage from './pages/StudyAssistantPage';
 import MyCourses from './pages/MyCourses';
+import PerformancePage from './pages/PerformancePage';
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -113,7 +114,7 @@ export default function App() {
           <Route path="exams" element={<ExamBank />} />
           <Route path="generator" element={<QuizGeneratorPage />} />
           <Route path="courses" element={<MyCourses />} />
-          <Route path="performance" element={<PlaceholderPage title="Performance Metrics" />} />
+          <Route path="performance" element={<PerformancePage />} />
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
         </Route>
 
