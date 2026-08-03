@@ -40,6 +40,7 @@ export default function Register() {
         email: userEmail,
         role: role,
         status: 'Active',
+        subscriptionPlan: 'free',
         added: new Date().toISOString().split('T')[0],
         targetExam: exam
       });

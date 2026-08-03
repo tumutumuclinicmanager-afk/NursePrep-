@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, Edit3, Database, Layers } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, Edit3, Database, Layers, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import QuestionBuilder from '@/components/staff/QuestionBuilder';
 import QuestionRepository from '@/components/staff/QuestionRepository';
+import ExamPublisher from '@/components/staff/ExamPublisher';
 
 export default function UploadExams() {
-  const [activeTab, setActiveTab] = useState<'builder' | 'pdf' | 'repository'>('builder');
+  const [activeTab, setActiveTab] = useState<'builder' | 'pdf' | 'repository' | 'publisher'>('publisher');
   const [refreshRepoTrigger, setRefreshRepoTrigger] = useState(0);
 
   // PDF Upload States
@@ -108,40 +109,56 @@ export default function UploadExams() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Top Navigation Tabs */}
-      <div className="flex border-b border-slate-200 bg-white rounded-xl p-1.5 shadow-xs border">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-white rounded-xl p-1.5 shadow-xs border border-slate-200">
+        <button
+          onClick={() => setActiveTab('publisher')}
+          className={`py-2.5 px-3 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+            activeTab === 'publisher'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 text-amber-300" /> Exam Publisher & Plans
+        </button>
+
         <button
           onClick={() => setActiveTab('builder')}
-          className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+          className={`py-2.5 px-3 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
             activeTab === 'builder'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
-          <Edit3 className="w-4 h-4" /> Interactive Question Creator
+          <Edit3 className="w-4 h-4" /> Question Creator
         </button>
 
         <button
           onClick={() => setActiveTab('pdf')}
-          className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+          className={`py-2.5 px-3 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
             activeTab === 'pdf'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
-          <Upload className="w-4 h-4" /> Bulk PDF Extractor
+          <Upload className="w-4 h-4" /> PDF Extractor
         </button>
 
         <button
           onClick={() => setActiveTab('repository')}
-          className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+          className={`py-2.5 px-3 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
             activeTab === 'repository'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
-          <Database className="w-4 h-4" /> Question Bank Repository
+          <Database className="w-4 h-4" /> Question Bank
         </button>
       </div>
+
+      {/* Tab 0: Exam Publisher & Subscription Rules */}
+      {activeTab === 'publisher' && (
+        <ExamPublisher onExamUpdated={() => setRefreshRepoTrigger(prev => prev + 1)} />
+      )}
 
       {/* Tab 1: Interactive Question Creator */}
       {activeTab === 'builder' && (

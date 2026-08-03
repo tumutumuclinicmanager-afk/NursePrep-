@@ -6,21 +6,13 @@ import {
   ArrowRight, DollarSign, ShoppingCart, Folder, FolderOpen, 
   ChevronRight, ChevronDown, ChevronLeft, Clock, HelpCircle, CheckCircle, 
   Award, Grid, List, Play, Tag, Layers, RefreshCw, X, AlertCircle, Database, Sparkles,
-  Bookmark, BookmarkCheck, Trash2, Star
+  Bookmark, BookmarkCheck, Trash2, Star, Lock, Crown, ShieldCheck
 } from 'lucide-react';
-import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import { ALL_QUIZ_QUESTIONS, normalizeExamCategory } from '@/data/quizQuestions';
 import { normalizeQuestion } from '@/lib/utils';
-
-const examBoards = [
-  { id: 'All', label: 'All Exam Boards', description: 'Complete library across all licensing authorities' },
-  { id: 'NCK', label: 'NCK (Kenya)', description: 'Nursing Council of Kenya Licensure Exams' },
-  { id: 'NCLEX', label: 'NCLEX-RN', description: 'National Council Licensure Examination' },
-  { id: 'HESI', label: 'HESI Assessment', description: 'Health Education Systems Specialty Practice' },
-  { id: 'GED', label: 'GED Prep', description: 'General Educational Development Foundations' },
-];
 
 const clinicalDomains = [
   'All Specialties',
@@ -36,7 +28,7 @@ const clinicalDomains = [
 interface ExamItem {
   id: string;
   title: string;
-  category: string; // NCK, NCLEX, HESI, GED
+  category: string; // NCK, NCLEX, HESI, GED, or custom categories
   domain: string; // Medical-Surgical, Pediatrics, etc.
   price: string;
   numericPrice: number;
@@ -49,6 +41,14 @@ interface ExamItem {
   color: string;
   bg: string;
   questions?: any[];
+  requiredPlan?: 'free' | 'basic' | 'gold' | 'platinum';
+  questionLimits?: {
+    free: number;
+    basic: number;
+    gold: number;
+    platinum: number;
+  };
+  isPublished?: boolean;
 }
 
 const defaultExamBundles: ExamItem[] = [
@@ -57,23 +57,25 @@ const defaultExamBundles: ExamItem[] = [
     title: 'NCK Medical-Surgical Mastery Mock', 
     category: 'NCK', 
     domain: 'Medical-Surgical Nursing', 
-    price: 'Ksh 3,500', 
-    numericPrice: 3500, 
+    price: 'Free Access', 
+    numericPrice: 0, 
     questionCount: 100, 
     durationMinutes: 120, 
     difficulty: 'Medium', 
-    isPremium: true, 
+    isPremium: false, 
     features: ['NCK Blueprint Aligned', 'Comprehensive Rationales', 'Performance Breakdown'], 
     icon: Activity, 
     color: 'text-purple-600', 
-    bg: 'bg-purple-100' 
+    bg: 'bg-purple-100',
+    requiredPlan: 'free',
+    questionLimits: { free: 10, basic: 50, gold: 0, platinum: 0 }
   },
   { 
     id: 'nck-complete-bundle', 
     title: 'NCK Council Licensure Complete Bundle', 
     category: 'NCK', 
     domain: 'Community & Public Health', 
-    price: 'Ksh 5,000', 
+    price: 'Gold Plan Required', 
     numericPrice: 5000, 
     questionCount: 250, 
     durationMinutes: 300, 
@@ -82,14 +84,16 @@ const defaultExamBundles: ExamItem[] = [
     features: ['10+ Full Mock Exams', 'Past Board Papers', 'Priority Tutor Review'], 
     icon: Activity, 
     color: 'text-purple-700', 
-    bg: 'bg-purple-50' 
+    bg: 'bg-purple-50',
+    requiredPlan: 'gold',
+    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 }
   },
   { 
     id: 'nclex-rn-nextgen-1', 
     title: 'NCLEX-RN NextGen Clinical Judgment Set', 
-    category: 'NCLEX', 
+    category: 'NCLEX-RN', 
     domain: 'Pharmacology & Parenteral Therapies', 
-    price: 'Free Practice', 
+    price: 'Free Access', 
     numericPrice: 0, 
     questionCount: 50, 
     durationMinutes: 60, 
@@ -99,6 +103,8 @@ const defaultExamBundles: ExamItem[] = [
     icon: Brain, 
     color: 'text-blue-600', 
     bg: 'bg-blue-100',
+    requiredPlan: 'free',
+    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 },
     questions: [
       {
         question: 'A nurse is caring for a patient experiencing acute anaphylaxis following intravenous antibiotic administration. Which medication should the nurse prepare to administer immediately?',
@@ -123,9 +129,9 @@ const defaultExamBundles: ExamItem[] = [
   { 
     id: 'nclex-comprehensive', 
     title: 'NCLEX Comprehensive CAT Simulation', 
-    category: 'NCLEX', 
+    category: 'NCLEX-RN', 
     domain: 'Medical-Surgical Nursing', 
-    price: 'Ksh 25,000', 
+    price: 'Basic Plan Required', 
     numericPrice: 25000, 
     questionCount: 500, 
     durationMinutes: 300, 
@@ -134,14 +140,16 @@ const defaultExamBundles: ExamItem[] = [
     features: ['Computer Adaptive Test Engine', '1500+ Question Pool', 'Unlimited Re-attempts'], 
     icon: Brain, 
     color: 'text-indigo-600', 
-    bg: 'bg-indigo-100' 
+    bg: 'bg-indigo-100',
+    requiredPlan: 'basic',
+    questionLimits: { free: 5, basic: 50, gold: 0, platinum: 0 }
   },
   { 
     id: 'hesi-pediatrics-1', 
     title: 'HESI Pediatric Nursing Specialty Practice', 
     category: 'HESI', 
     domain: 'Pediatric Nursing', 
-    price: 'Free Practice', 
+    price: 'Free Access', 
     numericPrice: 0, 
     questionCount: 30, 
     durationMinutes: 45, 
@@ -151,6 +159,8 @@ const defaultExamBundles: ExamItem[] = [
     icon: Baby, 
     color: 'text-rose-600', 
     bg: 'bg-rose-100',
+    requiredPlan: 'free',
+    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 },
     questions: [
       {
         question: 'An infant with tetralogy of Fallot experiences a hypercyanotic "tet" spell while crying. What is the nurse\'s primary immediate action?',
@@ -165,7 +175,7 @@ const defaultExamBundles: ExamItem[] = [
     title: 'HESI Exit Exam Assessment Package', 
     category: 'HESI', 
     domain: 'Maternal & Newborn Health', 
-    price: 'Ksh 15,000', 
+    price: 'Gold Plan Required', 
     numericPrice: 15000, 
     questionCount: 200, 
     durationMinutes: 180, 
@@ -174,14 +184,16 @@ const defaultExamBundles: ExamItem[] = [
     features: ['Predictive Exit Score', 'Targeted Remediation', 'Performance Diagnostics'], 
     icon: HeartPulse, 
     color: 'text-rose-700', 
-    bg: 'bg-rose-50' 
+    bg: 'bg-rose-50',
+    requiredPlan: 'gold',
+    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 }
   },
   { 
     id: 'ged-prep-1', 
     title: 'GED Science & Pre-Nursing Foundations', 
     category: 'GED', 
     domain: 'Nursing Fundamentals', 
-    price: 'Free Practice', 
+    price: 'Free Access', 
     numericPrice: 0, 
     questionCount: 40, 
     durationMinutes: 50, 
@@ -191,6 +203,8 @@ const defaultExamBundles: ExamItem[] = [
     icon: BookOpen, 
     color: 'text-emerald-600', 
     bg: 'bg-emerald-100',
+    requiredPlan: 'free',
+    questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 },
     questions: [
       {
         question: 'Which cellular organelle is primarily responsible for ATP energy production during aerobic respiration?',
@@ -199,37 +213,26 @@ const defaultExamBundles: ExamItem[] = [
         explanation: 'Mitochondria generate cellular energy (ATP) through electron transport and the Krebs cycle.'
       }
     ]
-  },
-  { 
-    id: 'ged-prep-mastery', 
-    title: 'GED Complete Academic Mastery Curriculum', 
-    category: 'GED', 
-    domain: 'Nursing Fundamentals', 
-    price: 'Ksh 25,000', 
-    numericPrice: 25000, 
-    questionCount: 350, 
-    durationMinutes: 240, 
-    difficulty: 'Medium', 
-    isPremium: true, 
-    features: ['Full Subject Modules', '1-on-1 Lecturer Tutoring', 'Certificates of Completion'], 
-    icon: BookOpen, 
-    color: 'text-emerald-700', 
-    bg: 'bg-emerald-50' 
-  },
+  }
 ];
 
-export interface FavoriteItem {
-  id: string;
-  user: string;
-  userId?: string;
-  questionStem: string;
+interface FavoriteItem {
+  docId: string;
+  question: string;
   options: string[];
   correctAnswer: string;
-  explanation?: string;
+  explanation: string;
   category?: string;
   domain?: string;
   savedAt?: string;
 }
+
+const PLAN_LEVELS: Record<string, number> = {
+  free: 1,
+  basic: 2,
+  gold: 3,
+  platinum: 4
+};
 
 export default function ExamBank() {
   const navigate = useNavigate();
@@ -239,6 +242,14 @@ export default function ExamBank() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'classified' | 'grid' | 'favorites'>('classified');
   
+  // State for student subscription
+  const [userSubscriptionPlan, setUserSubscriptionPlan] = useState<'free' | 'basic' | 'gold' | 'platinum'>('free');
+  const [requiredPlanModalExam, setRequiredPlanModalExam] = useState<ExamItem | null>(null);
+  const [practiceLimitInfo, setPracticeLimitInfo] = useState<{ limit: number; total: number } | null>(null);
+
+  // State for dynamic board categories
+  const [dynamicBoardCategories, setDynamicBoardCategories] = useState<string[]>(['NCK', 'NCLEX', 'NCLEX-RN', 'NCLEX-PN', 'HESI', 'GED']);
+
   // State for Firestore loaded exams
   const [examsList, setExamsList] = useState<ExamItem[]>(defaultExamBundles);
   const [loadingDb, setLoadingDb] = useState(false);
@@ -250,20 +261,11 @@ export default function ExamBank() {
 
   // Live Actual Question Counts tracking across all sources
   const [boardQuestionCounts, setBoardQuestionCounts] = useState<Record<string, number>>({
-    'All': ALL_QUIZ_QUESTIONS.length,
-    'NCK': ALL_QUIZ_QUESTIONS.filter(q => normalizeExamCategory(q.examMode) === 'NCK').length,
-    'NCLEX': ALL_QUIZ_QUESTIONS.filter(q => normalizeExamCategory(q.examMode) === 'NCLEX').length,
-    'HESI': ALL_QUIZ_QUESTIONS.filter(q => normalizeExamCategory(q.examMode) === 'HESI').length,
-    'GED': ALL_QUIZ_QUESTIONS.filter(q => normalizeExamCategory(q.examMode) === 'GED').length,
+    'All': ALL_QUIZ_QUESTIONS.length
   });
 
   // Accordion state for classified view
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    'NCK': true,
-    'NCLEX': true,
-    'HESI': true,
-    'GED': true,
-  });
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   // Modal states
   const [selectedBundle, setSelectedBundle] = useState<ExamItem | null>(null);
@@ -298,124 +300,151 @@ export default function ExamBank() {
 
   const fetchUserPurchases = async () => {
     try {
-      const userEmail = auth.currentUser?.email;
-      const userId = auth.currentUser?.uid;
-      if (!userEmail && !userId) return;
-
-      const q = query(collection(db, 'payments'));
-      const snapshot = await getDocs(q);
-      const set = new Set<string>();
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (
-          (data.userId === userId || data.user === userEmail) &&
-          (data.status === 'Approved' || data.status === 'Completed')
-        ) {
-          if (data.planName) set.add(data.planName);
-          if (data.plan) set.add(data.plan);
-          if (data.title) set.add(data.title);
-          if (data.examId) set.add(data.examId);
+      if (auth.currentUser) {
+        const userEmail = auth.currentUser.email || auth.currentUser.uid;
+        
+        // Fetch User Plan
+        try {
+          const userSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+          if (userSnap.exists()) {
+            const uData = userSnap.data();
+            const plan = (uData.subscriptionPlan || uData.plan || 'free').toLowerCase();
+            if (plan.includes('plat') || plan.includes('master')) setUserSubscriptionPlan('platinum');
+            else if (plan.includes('gold') || plan.includes('sure')) setUserSubscriptionPlan('gold');
+            else if (plan.includes('basic') || plan.includes('silver')) setUserSubscriptionPlan('basic');
+            else setUserSubscriptionPlan('free');
+          }
+        } catch (uErr) {
+          console.warn("Could not fetch user subscription plan:", uErr);
         }
-      });
-      setPurchasedTitles(set);
+
+        const q = query(collection(db, 'payments'), where('user', '==', userEmail));
+        const snap = await getDocs(q);
+        const titles = new Set<string>();
+        snap.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data.status === 'Approved' || data.status === 'Completed') {
+            if (data.plan) titles.add(data.plan);
+            if (data.planName) titles.add(data.planName);
+            if (data.examId) titles.add(data.examId);
+          }
+        });
+        setPurchasedTitles(titles);
+      }
     } catch (err) {
-      console.error('Error fetching user purchases:', err);
+      console.error('Error fetching purchases:', err);
     }
   };
 
-  // Fetch Bookmarked Favorites for logged-in user
   const fetchUserFavorites = async () => {
     try {
-      const userKey = auth.currentUser?.email || auth.currentUser?.uid;
-      if (!userKey) return;
-      const favRef = collection(db, 'Favorites');
-      const q = query(favRef, where('user', '==', userKey));
-      const snapshot = await getDocs(q);
-      const list: FavoriteItem[] = snapshot.docs.map(docSnap => ({
-        id: docSnap.id,
-        ...docSnap.data()
-      } as FavoriteItem));
-      setFavoritesList(list);
+      if (auth.currentUser) {
+        const q = query(collection(db, `users/${auth.currentUser.uid}/favorites`));
+        const snap = await getDocs(q);
+        const favs: FavoriteItem[] = snap.docs.map(docSnap => ({
+          docId: docSnap.id,
+          ...docSnap.data()
+        } as FavoriteItem));
+        setFavoritesList(favs);
+      } else {
+        const localFavs = JSON.parse(localStorage.getItem('nurseprep_guest_favorites') || '[]');
+        setFavoritesList(localFavs);
+      }
     } catch (err) {
       console.error('Error fetching favorites:', err);
     }
   };
 
-  const isQuestionBookmarked = (stem: string) => {
-    return favoritesList.some(f => f.questionStem === stem);
+  const isQuestionBookmarked = (questionStem: string): boolean => {
+    return favoritesList.some(f => f.question === questionStem);
   };
 
-  const toggleBookmark = async (qObj: any, defaultCategory?: string, defaultDomain?: string) => {
-    const stem = qObj.questionStem || qObj.question || '';
-    if (!stem) return;
+  const toggleBookmark = async (questionObj: any, category?: string, domain?: string) => {
+    const norm = normalizeQuestion(questionObj);
+    const stem = norm.question;
+    const exists = isQuestionBookmarked(stem);
 
-    if (!auth.currentUser) {
-      setFavoriteToast('Please sign in to bookmark questions to your Favorites.');
-      setTimeout(() => setFavoriteToast(null), 3000);
-      return;
-    }
-
-    const existing = favoritesList.find(f => f.questionStem === stem);
-    const userKey = auth.currentUser.email || auth.currentUser.uid;
-
-    if (existing) {
-      try {
-        await deleteDoc(doc(db, 'Favorites', existing.id));
-        setFavoritesList(prev => prev.filter(f => f.id !== existing.id));
-        setFavoriteToast('Removed question from Favorites.');
-        setTimeout(() => setFavoriteToast(null), 2500);
-      } catch (err) {
-        console.error('Error removing favorite:', err);
+    if (exists) {
+      const favToRemove = favoritesList.find(f => f.question === stem);
+      if (auth.currentUser && favToRemove?.docId) {
+        try {
+          await deleteDoc(doc(db, `users/${auth.currentUser.uid}/favorites`, favToRemove.docId));
+        } catch (e) {
+          console.error("Error removing favorite from Firestore:", e);
+        }
       }
+      const updated = favoritesList.filter(f => f.question !== stem);
+      setFavoritesList(updated);
+      if (!auth.currentUser) {
+        localStorage.setItem('nurseprep_guest_favorites', JSON.stringify(updated));
+      }
+      showToastNotification("Question removed from Favorites");
     } else {
-      try {
-        const newFav = {
-          user: userKey,
-          userId: auth.currentUser.uid,
-          questionStem: stem,
-          options: qObj.options ? qObj.options.map((o: any) => typeof o === 'string' ? o : o.text) : ['Option A', 'Option B', 'Option C', 'Option D'],
-          correctAnswer: qObj.correctAnswer || (qObj.options ? (qObj.options.find((o: any) => o.isCorrect)?.text || qObj.options[0]?.text) : ''),
-          explanation: qObj.explanation || qObj.rationale || '',
-          category: defaultCategory || qObj.examMode || qObj.category || 'NCK',
-          domain: defaultDomain || qObj.unitDomain || qObj.domain || 'Medical-Surgical Nursing',
-          savedAt: new Date().toISOString()
-        };
+      const newFav: FavoriteItem = {
+        docId: `fav-${Date.now()}`,
+        question: stem,
+        options: norm.options,
+        correctAnswer: norm.correctAnswer,
+        explanation: norm.explanation,
+        category: category || 'General',
+        domain: domain || 'General Practice',
+        savedAt: new Date().toISOString()
+      };
 
-        const docRef = await addDoc(collection(db, 'Favorites'), newFav);
-        setFavoritesList(prev => [...prev, { id: docRef.id, ...newFav }]);
-        setFavoriteToast('Saved to your Favorites collection!');
-        setTimeout(() => setFavoriteToast(null), 2500);
-      } catch (err) {
-        console.error('Error adding favorite:', err);
+      if (auth.currentUser) {
+        try {
+          const docRef = await addDoc(collection(db, `users/${auth.currentUser.uid}/favorites`), {
+            question: norm.question,
+            options: norm.options,
+            correctAnswer: norm.correctAnswer,
+            explanation: norm.explanation,
+            category: category || 'General',
+            domain: domain || 'General Practice',
+            savedAt: new Date().toISOString()
+          });
+          newFav.docId = docRef.id;
+        } catch (e) {
+          console.error("Error saving favorite to Firestore:", e);
+        }
       }
+
+      const updated = [...favoritesList, newFav];
+      setFavoritesList(updated);
+      if (!auth.currentUser) {
+        localStorage.setItem('nurseprep_guest_favorites', JSON.stringify(updated));
+      }
+      showToastNotification("Question saved to Favorites Collection!");
     }
+  };
+
+  const showToastNotification = (msg: string) => {
+    setFavoriteToast(msg);
+    setTimeout(() => setFavoriteToast(null), 3000);
   };
 
   const startFavoritesPractice = () => {
     if (favoritesList.length === 0) return;
-    const questions = favoritesList.map(f => ({
-      question: f.questionStem,
-      options: f.options,
-      correctAnswer: f.correctAnswer,
-      explanation: f.explanation
-    }));
-
     const favExamItem: ExamItem = {
       id: 'favorites-practice-session',
-      title: 'Bookmarked Favorites Review Practice',
-      category: 'Favorites',
-      domain: 'Personalized Favorites Bank',
-      price: 'Free Practice',
+      title: 'My Saved Favorites Practice Bank',
+      category: 'NCK',
+      domain: 'Custom Revision',
+      price: 'Free Access',
       numericPrice: 0,
-      questionCount: questions.length,
-      durationMinutes: Math.max(10, questions.length * 2),
+      questionCount: favoritesList.length,
+      durationMinutes: Math.max(15, favoritesList.length * 2),
       difficulty: 'Medium',
       isPremium: false,
-      features: ['Saved Questions', 'Targeted Review', 'Instant Rationale'],
+      features: ['Personalized Review', 'High Priority Items', 'Self Paced'],
       icon: Bookmark,
       color: 'text-amber-600',
-      bg: 'bg-amber-50',
-      questions: questions
+      bg: 'bg-amber-100',
+      questions: favoritesList.map(f => ({
+        question: f.question,
+        options: f.options,
+        correctAnswer: f.correctAnswer,
+        explanation: f.explanation
+      }))
     };
 
     setPracticeExam(favExamItem);
@@ -425,7 +454,7 @@ export default function ExamBank() {
     setExamCompleted(false);
   };
 
-  // Fetch Firestore Exams AND Questions to aggregate exact live counts
+  // Fetch Firestore Exams AND Questions
   const fetchAllExamsAndQuestions = async () => {
     try {
       setLoadingDb(true);
@@ -438,26 +467,35 @@ export default function ExamBank() {
       if (!examsSnap.empty) {
         examsSnap.docs.forEach(docSnap => {
           const data = docSnap.data();
+          
+          // Hide unpublished/draft exams for students
+          if (data.isPublished === false) return;
+
           const cat = normalizeExamCategory(data.category);
           const qList = data.questions || [];
           qList.forEach((q: any) => examDocsQuestions.push({ ...q, examMode: cat }));
 
+          const reqP = (data.requiredPlan || 'free').toLowerCase() as any;
+
           dbExams.push({
             id: docSnap.id,
             title: data.title || 'Custom Uploaded Exam',
-            category: cat === 'Custom' ? 'NCK' : cat,
+            category: cat,
             domain: data.domain || 'Medical-Surgical Nursing',
-            price: 'Free Practice',
+            price: data.price || (reqP !== 'free' ? `${reqP.toUpperCase()} PLAN` : 'Free Access'),
             numericPrice: 0,
             questionCount: qList.length,
             durationMinutes: Math.max(15, qList.length * 2),
             difficulty: 'Medium',
-            isPremium: false,
-            features: ['Lecturer Uploaded', 'Instant Feedback', 'Verified Questions'],
-            icon: cat === 'NCLEX' ? Brain : cat === 'HESI' ? HeartPulse : cat === 'GED' ? BookOpen : Activity,
+            isPremium: reqP !== 'free',
+            features: ['Lecturer Authored', 'Verified Questions', 'Instant Feedback'],
+            icon: cat === 'NCLEX' || cat === 'NCLEX-RN' ? Brain : cat === 'HESI' ? HeartPulse : cat === 'GED' ? BookOpen : Activity,
             color: 'text-blue-600',
             bg: 'bg-blue-50',
-            questions: qList
+            questions: qList,
+            requiredPlan: reqP,
+            questionLimits: data.questionLimits || { free: 5, basic: 25, gold: 0, platinum: 0 },
+            isPublished: true
           });
         });
       }
@@ -491,55 +529,67 @@ export default function ExamBank() {
       });
 
       const dynamicBoardExams: ExamItem[] = Object.entries(questionsByBoard).map(([cat, qList]) => ({
-        id: `db-questions-${cat.toLowerCase()}`,
+        id: `db-questions-${cat.toLowerCase().replace(/\s+/g, '-')}`,
         title: `${cat} Lecturer Published Question Bank (${qList.length} Questions)`,
-        category: cat === 'Custom' ? 'NCK' : cat,
+        category: cat,
         domain: 'Medical-Surgical Nursing',
-        price: 'Free Practice',
+        price: 'Free Access',
         numericPrice: 0,
         questionCount: qList.length,
         durationMinutes: Math.max(15, qList.length * 2),
         difficulty: 'Medium',
         isPremium: false,
         features: ['Lecturer Authored', 'Live Bank Item', 'Continuous Updates'],
-        icon: cat === 'NCLEX' ? Brain : cat === 'HESI' ? HeartPulse : cat === 'GED' ? BookOpen : Activity,
+        icon: cat === 'NCLEX' || cat === 'NCLEX-RN' ? Brain : cat === 'HESI' ? HeartPulse : cat === 'GED' ? BookOpen : Activity,
         color: 'text-emerald-600',
         bg: 'bg-emerald-50',
-        questions: qList
+        questions: qList,
+        requiredPlan: 'free',
+        questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 }
       }));
 
       // Merge all exam items
       const combinedExams = [...dbExams, ...dynamicBoardExams, ...defaultExamBundles];
       setExamsList(combinedExams);
 
-      // 3. Compute Exact Total Question Counts per Board
+      // Collect all unique categories dynamically
+      const categorySet = new Set<string>(['NCK', 'NCLEX-RN', 'HESI', 'GED']);
+      combinedExams.forEach(e => {
+        if (e.category) categorySet.add(e.category);
+      });
+      const allCategories = Array.from(categorySet);
+      setDynamicBoardCategories(allCategories);
+
+      // Expand all categories by default
+      const initialExpanded: Record<string, boolean> = {};
+      allCategories.forEach(c => initialExpanded[c] = true);
+      setExpandedCategories(initialExpanded);
+
+      // Compute Exact Total Question Counts per Board Category
+      const counts: Record<string, number> = { 'All': 0 };
+      allCategories.forEach(c => counts[c] = 0);
+
       const allAggregatedQuestions = [
         ...ALL_QUIZ_QUESTIONS.map(q => ({ mode: q.examMode })),
         ...dbQuestionsList.map(q => ({ mode: q.examMode || q.category })),
         ...examDocsQuestions.map(q => ({ mode: q.examMode }))
       ];
 
-      const counts: Record<string, number> = {
-        'All': allAggregatedQuestions.length,
-        'NCK': 0,
-        'NCLEX': 0,
-        'HESI': 0,
-        'GED': 0,
-      };
+      counts['All'] = allAggregatedQuestions.length;
 
       allAggregatedQuestions.forEach(item => {
         const cat = normalizeExamCategory(item.mode);
         if (counts[cat] !== undefined) {
           counts[cat]++;
         } else {
-          counts['NCK']++;
+          counts[cat] = 1;
         }
       });
 
       setBoardQuestionCounts(counts);
 
     } catch (err) {
-      console.error('Error fetching exams and questions for question counts:', err);
+      console.error('Error fetching exams and questions:', err);
     } finally {
       setLoadingDb(false);
     }
@@ -559,14 +609,16 @@ export default function ExamBank() {
     const matchesBoard = selectedBoard === 'All' || exam.category === selectedBoard;
     const matchesDomain = selectedDomain === 'All Specialties' || exam.domain === selectedDomain;
     const matchesDifficulty = selectedDifficulty === 'All' || exam.difficulty === selectedDifficulty;
-    const matchesSearch = exam.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          exam.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          exam.domain.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesBoard && matchesDomain && matchesDifficulty && matchesSearch;
+    const matchesQuery = searchQuery === '' || 
+      exam.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      exam.domain.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      exam.category.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesBoard && matchesDomain && matchesDifficulty && matchesQuery;
   });
 
-  // Group filtered exams by Board Category
-  const groupedExams = ['NCK', 'NCLEX', 'HESI', 'GED'].reduce((acc, cat) => {
+  // Group filtered exams dynamically by Board Category
+  const groupedExams = dynamicBoardCategories.reduce((acc, cat) => {
     const categoryExams = filteredExams.filter(e => e.category === cat);
     if (categoryExams.length > 0) {
       acc[cat] = categoryExams;
@@ -575,28 +627,51 @@ export default function ExamBank() {
   }, {} as Record<string, ExamItem[]>);
 
   const handleAction = (exam: ExamItem) => {
-    // Check if already purchased
+    // Check if user has purchased item explicitly
     if (purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id)) {
       navigate('/dashboard/courses');
       return;
     }
 
-    if (!exam.isPremium && exam.questions && exam.questions.length > 0) {
-      // Launch practice mode
-      setPracticeExam(exam);
-      setCurrentQuestionIndex(0);
-      setSelectedAnswers({});
-      setShowRationale({});
-      setExamCompleted(false);
-    } else {
-      // Payment requirement
-      if (!auth.currentUser) {
-        navigate('/login');
-        return;
-      }
-      setSelectedBundle(exam);
-      setShowPaymentModal(true);
+    const reqPlan = exam.requiredPlan || 'free';
+    const reqLevel = PLAN_LEVELS[reqPlan] || 1;
+    const userLevel = PLAN_LEVELS[userSubscriptionPlan] || 1;
+
+    // 1. Subscription Tier Gate Check
+    if (userLevel < reqLevel) {
+      setRequiredPlanModalExam(exam);
+      return;
     }
+
+    // 2. Launch Practice with Question Display Limits
+    const qList = exam.questions || [];
+    if (qList.length === 0) {
+      alert("This exam does not have questions attached yet.");
+      return;
+    }
+
+    const limits = exam.questionLimits || { free: 5, basic: 25, gold: 0, platinum: 0 };
+    const maxAllowed = limits[userSubscriptionPlan] ?? 0;
+
+    let displayQuestions = [...qList];
+    if (maxAllowed > 0 && maxAllowed < qList.length) {
+      displayQuestions = qList.slice(0, maxAllowed);
+      setPracticeLimitInfo({ limit: maxAllowed, total: qList.length });
+    } else {
+      setPracticeLimitInfo(null);
+    }
+
+    const launchExam: ExamItem = {
+      ...exam,
+      questions: displayQuestions,
+      questionCount: displayQuestions.length
+    };
+
+    setPracticeExam(launchExam);
+    setCurrentQuestionIndex(0);
+    setSelectedAnswers({});
+    setShowRationale({});
+    setExamCompleted(false);
   };
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
@@ -652,6 +727,31 @@ export default function ExamBank() {
     return { correct, total, percentage: total > 0 ? Math.round((correct / total) * 100) : 0 };
   };
 
+  const getPlanBadge = (plan?: string) => {
+    switch (plan) {
+      case 'platinum':
+        return <span className="px-2.5 py-0.5 bg-purple-100 text-purple-900 border border-purple-300 text-[10px] font-extrabold rounded-full flex items-center gap-1"><Crown className="w-3 h-3 text-purple-600" /> Platinum / Master Tier</span>;
+      case 'gold':
+        return <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold rounded-full flex items-center gap-1"><Crown className="w-3 h-3 text-amber-600" /> Gold / Sure Pass Tier</span>;
+      case 'basic':
+        return <span className="px-2.5 py-0.5 bg-slate-200 text-slate-900 border border-slate-300 text-[10px] font-extrabold rounded-full flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-slate-600" /> Silver / Basic Tier</span>;
+      default:
+        return <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-extrabold rounded-full flex items-center gap-1"><CheckCircle className="w-3 h-3 text-emerald-600" /> Free Public Access</span>;
+    }
+  };
+
+  const getQuestionLimitPill = (exam: ExamItem) => {
+    const limits = exam.questionLimits || { free: 5, basic: 25, gold: 0, platinum: 0 };
+    const maxForUser = limits[userSubscriptionPlan] ?? 0;
+    const totalQs = exam.questionCount || (exam.questions ? exam.questions.length : 0);
+
+    if (maxForUser === 0 || maxForUser >= totalQs) {
+      return <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Full Access ({totalQs} Qs)</span>;
+    } else {
+      return <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{maxForUser} Qs on {userSubscriptionPlan.toUpperCase()} Plan</span>;
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
       {/* Header Banner */}
@@ -662,8 +762,14 @@ export default function ExamBank() {
           </div>
           <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">Exam Bank & Repository</h1>
           <p className="text-slate-300 text-sm md:text-base leading-relaxed">
-            Practice and master board-standard nursing exams classified by Exam Authority (NCK, NCLEX-RN, HESI, GED) and Clinical Specialties.
+            Practice board-standard nursing exams classified by Exam Authority (NCK, NCLEX-RN, HESI, GED, and custom uploaded categories) and Clinical Specialties.
           </p>
+          <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
+            <span className="text-slate-300">Your Active Plan:</span>
+            <span className="px-3 py-1 rounded-full font-extrabold bg-blue-500 text-white uppercase tracking-wider">
+              {userSubscriptionPlan.toUpperCase()} PLAN
+            </span>
+          </div>
         </div>
       </div>
 
@@ -681,22 +787,15 @@ export default function ExamBank() {
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Track the exact number of questions available across NCK, NCLEX-RN, HESI, and GED exam modes in real-time.
+              <strong>{boardQuestionCounts['All'] || 0}</strong> items across all exam categories in real-time.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-          <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
-            <span className="text-xs font-bold text-slate-500">Total System Questions:</span>
-            <span className="text-sm font-extrabold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-lg border border-blue-200">
-              {boardQuestionCounts['All'] || 0}
-            </span>
-          </div>
-
+        <div className="flex items-center gap-2 self-end md:self-center">
           <Button 
             variant="outline" 
-            size="sm" 
+            size="sm"
             onClick={fetchAllExamsAndQuestions}
             disabled={loadingDb}
             className="text-xs font-bold gap-1.5"
@@ -706,16 +805,46 @@ export default function ExamBank() {
         </div>
       </div>
 
-      {/* Board Selector Tabs */}
+      {/* Dynamic Board Selector Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {examBoards.map((board) => {
-          const count = boardQuestionCounts[board.id] || 0;
+        <button
+          onClick={() => setSelectedBoard('All')}
+          className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
+            selectedBoard === 'All'
+              ? 'bg-blue-600 border-blue-600 text-white shadow-md ring-2 ring-blue-500/20'
+              : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-slate-50/80'
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <span className={`text-[10px] font-bold uppercase tracking-wider block ${
+                selectedBoard === 'All' ? 'text-blue-200' : 'text-slate-400'
+              }`}>
+                Complete
+              </span>
+              <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded-full ${
+                selectedBoard === 'All' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700 border border-blue-100'
+              }`}>
+                {boardQuestionCounts['All'] || 0} Questions
+              </span>
+            </div>
+            <h3 className="font-bold text-sm md:text-base">All Exam Boards</h3>
+          </div>
+          <p className={`text-[11px] mt-2 line-clamp-2 ${
+            selectedBoard === 'All' ? 'text-blue-100' : 'text-slate-500'
+          }`}>
+            Complete library across all licensing authorities
+          </p>
+        </button>
+
+        {dynamicBoardCategories.map((catKey) => {
+          const count = boardQuestionCounts[catKey] || 0;
           return (
             <button
-              key={board.id}
-              onClick={() => setSelectedBoard(board.id)}
+              key={catKey}
+              onClick={() => setSelectedBoard(catKey)}
               className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                selectedBoard === board.id
+                selectedBoard === catKey
                   ? 'bg-blue-600 border-blue-600 text-white shadow-md ring-2 ring-blue-500/20'
                   : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-slate-50/80'
               }`}
@@ -723,24 +852,24 @@ export default function ExamBank() {
               <div>
                 <div className="flex items-center justify-between gap-1 mb-1">
                   <span className={`text-[10px] font-bold uppercase tracking-wider block ${
-                    selectedBoard === board.id ? 'text-blue-200' : 'text-slate-400'
+                    selectedBoard === catKey ? 'text-blue-200' : 'text-slate-400'
                   }`}>
-                    {board.id === 'All' ? 'Complete' : 'Authority'}
+                    Authority
                   </span>
                   <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded-full ${
-                    selectedBoard === board.id 
+                    selectedBoard === catKey 
                       ? 'bg-white/20 text-white' 
                       : 'bg-blue-50 text-blue-700 border border-blue-100'
                   }`}>
                     {count} {count === 1 ? 'Question' : 'Questions'}
                   </span>
                 </div>
-                <h3 className="font-bold text-sm md:text-base">{board.label}</h3>
+                <h3 className="font-bold text-sm md:text-base">{catKey}</h3>
               </div>
               <p className={`text-[11px] mt-2 line-clamp-2 ${
-                selectedBoard === board.id ? 'text-blue-100' : 'text-slate-500'
+                selectedBoard === catKey ? 'text-blue-100' : 'text-slate-500'
               }`}>
-                {board.description}
+                {catKey} Specialty & Licensure Bank
               </p>
             </button>
           );
@@ -798,52 +927,22 @@ export default function ExamBank() {
                 <List className="w-3.5 h-3.5" /> Classified
               </button>
               <button
-                onClick={() => setViewMode('grid')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
-                  viewMode === 'grid'
-                    ? 'bg-white text-blue-600 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Grid className="w-3.5 h-3.5" /> Grid View
-              </button>
-              <button
                 onClick={() => setViewMode('favorites')}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
                   viewMode === 'favorites'
                     ? 'bg-amber-500 text-white shadow-xs'
-                    : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200'
+                    : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Bookmark className="w-3.5 h-3.5 fill-current" /> Favorites ({favoritesList.length})
+                <Bookmark className="w-3.5 h-3.5" /> Favorites ({favoritesList.length})
               </button>
             </div>
           </div>
         </div>
-
-        {/* Clinical Domain Specialty Filter Pills */}
-        <div className="pt-2 border-t border-slate-100 flex items-center gap-2 overflow-x-auto pb-1 hide-scrollbar">
-          <Tag className="w-4 h-4 text-slate-400 shrink-0" />
-          <span className="text-xs font-bold text-slate-500 shrink-0 mr-1">Specialties:</span>
-          {clinicalDomains.map((domain) => (
-            <button
-              key={domain}
-              onClick={() => setSelectedDomain(domain)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                selectedDomain === domain
-                  ? 'bg-blue-100 text-blue-800 border border-blue-300 font-bold'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent'
-              }`}
-            >
-              {domain}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* Main Exam Content View */}
+      {/* Main Content Area */}
       {viewMode === 'classified' ? (
-        /* Classified Folder View */
         <div className="space-y-6">
           {Object.keys(groupedExams).length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 p-12 text-center space-y-3">
@@ -864,9 +963,8 @@ export default function ExamBank() {
               </Button>
             </div>
           ) : (
-            Object.entries(groupedExams).map(([catKey, exams]) => {
+            (Object.entries(groupedExams) as [string, ExamItem[]][]).map(([catKey, exams]) => {
               const isExpanded = expandedCategories[catKey] !== false;
-              const boardInfo = examBoards.find(b => b.id === catKey);
 
               return (
                 <div key={catKey} className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -876,17 +974,12 @@ export default function ExamBank() {
                     className="p-4 md:p-5 bg-slate-50/80 hover:bg-slate-100/80 transition-colors border-b border-slate-200 flex items-center justify-between cursor-pointer select-none"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg font-bold ${
-                        catKey === 'NCK' ? 'bg-purple-100 text-purple-700' :
-                        catKey === 'NCLEX' ? 'bg-blue-100 text-blue-700' :
-                        catKey === 'HESI' ? 'bg-rose-100 text-rose-700' :
-                        'bg-emerald-100 text-emerald-700'
-                      }`}>
+                      <div className="p-2 rounded-lg font-bold bg-blue-100 text-blue-700">
                         {isExpanded ? <FolderOpen className="w-5 h-5" /> : <Folder className="w-5 h-5" />}
                       </div>
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-lg font-extrabold text-slate-900">{boardInfo?.label || catKey}</h2>
+                          <h2 className="text-lg font-extrabold text-slate-900">{catKey}</h2>
                           <span className="bg-blue-100 text-blue-800 text-xs font-extrabold px-2.5 py-0.5 rounded-full border border-blue-200">
                             {boardQuestionCounts[catKey] || 0} Questions Available
                           </span>
@@ -894,13 +987,13 @@ export default function ExamBank() {
                             {exams.length} {exams.length === 1 ? 'Exam Item' : 'Exam Items'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">{boardInfo?.description}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{catKey} Licensure & Specialty Practice Collection</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-400 hidden sm:inline">
-                        {isExpanded ? 'Collapse Category' : 'Expand Category'}
+                        {isExpanded ? 'Collapse' : 'Expand'}
                       </span>
                       {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-400" /> : <ChevronRight className="w-5 h-5 text-slate-400" />}
                     </div>
@@ -913,6 +1006,7 @@ export default function ExamBank() {
                         <div key={exam.id} className="p-4 md:p-6 hover:bg-slate-50/60 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div className="space-y-2 max-w-3xl">
                             <div className="flex flex-wrap items-center gap-2">
+                              {getPlanBadge(exam.requiredPlan)}
                               <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold rounded-full">
                                 {exam.domain}
                               </span>
@@ -923,11 +1017,7 @@ export default function ExamBank() {
                               }`}>
                                 {exam.difficulty}
                               </span>
-                              {!exam.isPremium && (
-                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">
-                                  Free Practice Mode
-                                </span>
-                              )}
+                              {getQuestionLimitPill(exam)}
                             </div>
 
                             <h3 className="text-base md:text-lg font-bold text-slate-900">{exam.title}</h3>
@@ -935,7 +1025,7 @@ export default function ExamBank() {
                             <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-1">
                               <div className="flex items-center gap-1">
                                 <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
-                                <span><strong>{exam.questionCount}</strong> Questions</span>
+                                <span><strong>{exam.questionCount}</strong> Total Questions</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -946,28 +1036,24 @@ export default function ExamBank() {
 
                           <div className="flex items-center justify-between md:justify-end gap-4 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
                             <div className="text-left md:text-right">
-                              <span className="text-xs text-slate-400 block font-medium">Access Fee</span>
-                              <span className="text-base font-extrabold text-slate-900">
-                                {purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id) ? 'Enrolled' : exam.price}
+                              <span className="text-xs text-slate-400 block font-medium">Access Plan</span>
+                              <span className="text-sm font-extrabold text-slate-900 uppercase">
+                                {(exam.requiredPlan || 'FREE').toUpperCase()}
                               </span>
                             </div>
 
                             <Button 
                               onClick={() => handleAction(exam)}
                               className={`gap-2 ${
-                                purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id)
-                                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                                  : !exam.isPremium 
-                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
-                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                PLAN_LEVELS[userSubscriptionPlan] < PLAN_LEVELS[exam.requiredPlan || 'free']
+                                  ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                               }`}
                             >
-                              {purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id) ? (
-                                <><BookOpen className="w-4 h-4" /> Go to My Courses</>
-                              ) : !exam.isPremium ? (
-                                <><Play className="w-4 h-4 fill-white" /> Start Practice</>
+                              {PLAN_LEVELS[userSubscriptionPlan] < PLAN_LEVELS[exam.requiredPlan || 'free'] ? (
+                                <><Lock className="w-4 h-4" /> Locked ({exam.requiredPlan?.toUpperCase()})</>
                               ) : (
-                                <><ShoppingCart className="w-4 h-4" /> Enroll / Buy</>
+                                <><Play className="w-4 h-4 fill-white" /> Start Practice</>
                               )}
                             </Button>
                           </div>
@@ -980,7 +1066,7 @@ export default function ExamBank() {
             })
           )}
         </div>
-      ) : viewMode === 'favorites' ? (
+      ) : (
         /* Saved Favorites Collection View */
         <div className="space-y-6">
           <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -996,7 +1082,7 @@ export default function ExamBank() {
                   </span>
                 </h2>
                 <p className="text-xs text-slate-600 mt-1">
-                  Review and practice questions saved to your personal Firestore Favorites library for high-priority study.
+                  Review and practice questions saved to your personal Favorites library.
                 </p>
               </div>
             </div>
@@ -1018,187 +1104,133 @@ export default function ExamBank() {
               </div>
               <div className="space-y-1">
                 <h3 className="text-lg font-bold text-slate-800">No Bookmarked Questions Yet</h3>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Click the <strong>Bookmark</strong> button on any question while taking a practice exam to save it here for targeted review!
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Click the bookmark icon during practice to save challenging questions for later review.
                 </p>
               </div>
-              <Button 
-                onClick={() => setViewMode('classified')}
-                variant="outline" 
-                size="sm"
-              >
-                Browse Exam Bank Questions
-              </Button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid gap-4">
               {favoritesList.map((fav, index) => (
-                <div 
-                  key={fav.id} 
-                  className="bg-white rounded-xl border border-slate-200 p-5 md:p-6 shadow-xs hover:border-amber-300 transition-all space-y-4"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 font-extrabold text-[11px] rounded-full border border-amber-200">
-                        {fav.category || 'NCK'}
-                      </span>
-                      {fav.domain && (
-                        <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 font-bold text-[11px] rounded-full">
-                          {fav.domain}
-                        </span>
-                      )}
-                      <span className="text-[10px] text-slate-400 font-semibold">
-                        Saved: {fav.savedAt ? new Date(fav.savedAt).toLocaleDateString() : 'Recently'}
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={() => toggleBookmark({ questionStem: fav.questionStem })}
-                      className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
-                      title="Remove from Favorites"
+                <div key={fav.docId || index} className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                  <div className="flex justify-between items-start gap-4">
+                    <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-bold rounded-full border border-amber-200">
+                      {fav.category} • {fav.domain}
+                    </span>
+                    <button 
+                      onClick={() => toggleBookmark({ question: fav.question, options: fav.options, correctAnswer: fav.correctAnswer, explanation: fav.explanation })}
+                      className="text-slate-400 hover:text-rose-600 text-xs font-bold flex items-center gap-1"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="hidden sm:inline">Remove</span>
+                      <Trash2 className="w-3.5 h-3.5" /> Remove
                     </button>
                   </div>
-
-                  {/* Question Stem */}
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
-                      Question #{index + 1}
-                    </span>
-                    <h4 className="text-base font-bold text-slate-900 leading-snug">
-                      {fav.questionStem}
-                    </h4>
-                  </div>
-
-                  {/* Options */}
-                  {fav.options && fav.options.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                      {fav.options.map((opt, optIdx) => {
-                        const isCorrect = opt === fav.correctAnswer;
-                        return (
-                          <div 
-                            key={optIdx}
-                            className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 ${
-                              isCorrect 
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold' 
-                                : 'bg-slate-50 border-slate-200 text-slate-700'
-                            }`}
-                          >
-                            <span className="w-5 h-5 rounded-full bg-white text-slate-600 text-[10px] font-bold flex items-center justify-center border border-slate-200 shrink-0">
-                              {String.fromCharCode(65 + optIdx)}
-                            </span>
-                            <span className="flex-grow">{opt}</span>
-                            {isCorrect && <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Clinical Explanation */}
-                  {fav.explanation && (
-                    <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl space-y-1 text-xs">
-                      <span className="font-extrabold text-blue-900 uppercase tracking-wider block text-[10px]">
-                        Clinical Rationale
-                      </span>
-                      <p className="text-blue-950 leading-relaxed">
-                        {fav.explanation}
-                      </p>
-                    </div>
-                  )}
+                  <p className="font-bold text-slate-900 text-sm">{fav.question}</p>
                 </div>
               ))}
             </div>
           )}
         </div>
-      ) : (
-        /* Grid View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredExams.map((exam) => (
-            <Card key={exam.id} className="hover:shadow-md transition-shadow group overflow-hidden border-slate-200 flex flex-col">
-              <CardContent className="p-0 flex flex-col h-full">
-                <div className="p-6 border-b border-slate-100 flex-grow space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${exam.bg} ${exam.color}`}>
-                      <exam.icon className="w-5 h-5" />
-                    </div>
-                    <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">
-                      {exam.category}
-                    </span>
-                  </div>
+      )}
 
-                  <div>
-                    <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block mb-1">
-                      {exam.domain}
-                    </span>
-                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
-                      {exam.title}
-                    </h3>
-                  </div>
+      {/* Subscription Required Lock Modal */}
+      {requiredPlanModalExam && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95">
+            <div className="p-6 bg-gradient-to-br from-slate-900 to-blue-950 text-white relative">
+              <button 
+                onClick={() => setRequiredPlanModalExam(null)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="w-12 h-12 bg-amber-500/20 border border-amber-400/40 text-amber-400 rounded-xl flex items-center justify-center mb-3">
+                <Crown className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-extrabold tracking-tight">Subscription Upgrade Required</h3>
+              <p className="text-xs text-slate-300 mt-1">
+                Access to <strong>{requiredPlanModalExam.title}</strong> is restricted.
+              </p>
+            </div>
 
-                  <div className="flex items-center gap-4 text-xs text-slate-500 pt-2 border-t border-slate-100">
-                    <div className="flex items-center gap-1">
-                      <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{exam.questionCount} Questions</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{exam.durationMinutes} Mins</span>
-                    </div>
-                  </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs space-y-2 text-amber-950">
+                <div className="flex justify-between items-center font-bold">
+                  <span>Required Subscription:</span>
+                  <span className="px-2 py-0.5 bg-amber-200 text-amber-900 rounded font-extrabold uppercase">
+                    {requiredPlanModalExam.requiredPlan} Plan
+                  </span>
                 </div>
-
-                <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-t border-slate-100">
-                  <div className="text-lg font-bold text-slate-900">
-                    {purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id) ? 'Enrolled' : exam.price}
-                  </div>
-                  <Button 
-                    onClick={() => handleAction(exam)} 
-                    size="sm"
-                    className={
-                      purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id)
-                        ? 'bg-purple-600 hover:bg-purple-700 text-white gap-1.5'
-                        : !exam.isPremium 
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5' 
-                          : 'bg-blue-600 hover:bg-blue-700 text-white gap-1.5'
-                    }
-                  >
-                    {purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id) ? (
-                      <><BookOpen className="w-3.5 h-3.5" /> My Courses</>
-                    ) : !exam.isPremium ? (
-                      <><Play className="w-3.5 h-3.5 fill-white" /> Practice</>
-                    ) : (
-                      <><ShoppingCart className="w-3.5 h-3.5" /> Buy Now</>
-                    )}
-                  </Button>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Your Current Plan:</span>
+                  <span className="font-bold uppercase">{userSubscriptionPlan} Plan</span>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Upgrade your subscription plan to unlock full access to this exam, complete question banks, and detailed clinical explanations.
+              </p>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <Button 
+                  onClick={() => {
+                    setRequiredPlanModalExam(null);
+                    navigate('/dashboard/pricing');
+                  }}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold gap-2 py-3 shadow-md"
+                >
+                  <Crown className="w-4 h-4 fill-white" /> Upgrade Subscription Plan
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setRequiredPlanModalExam(null)}
+                  className="w-full text-slate-600"
+                >
+                  Maybe Later
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Practice Exam Interactive Runner Modal */}
-      {practiceExam && practiceExam.questions && practiceExam.questions.length > 0 && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 overflow-hidden border border-slate-200">
+      {/* Practice Exam Attempt Modal */}
+      {practiceExam && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 md:p-6 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col border border-slate-100">
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-200 bg-slate-900 text-white flex justify-between items-center">
+            <div className="p-4 md:p-6 bg-slate-900 text-white flex items-center justify-between shrink-0 sticky top-0 z-20">
               <div>
-                <span className="text-xs text-blue-400 font-bold uppercase tracking-widest block">
-                  {practiceExam.category} Practice Mode
+                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400 block">
+                  {practiceExam.category} • {practiceExam.domain}
                 </span>
-                <h3 className="font-bold text-lg">{practiceExam.title}</h3>
+                <h2 className="text-base md:text-xl font-extrabold tracking-tight">{practiceExam.title}</h2>
               </div>
               <button 
                 onClick={() => setPracticeExam(null)}
-                className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Subscription Question Display Limit Banner */}
+            {practiceLimitInfo && !examCompleted && (
+              <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 text-xs text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shrink-0">
+                <div className="flex items-center gap-2 font-bold">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{userSubscriptionPlan.toUpperCase()} PLAN PREVIEW: Displaying {practiceLimitInfo.limit} of {practiceLimitInfo.total} total questions.</span>
+                </div>
+                <button 
+                  onClick={() => {
+                    setPracticeExam(null);
+                    navigate('/dashboard/pricing');
+                  }}
+                  className="text-amber-800 underline font-extrabold hover:text-amber-950 shrink-0"
+                >
+                  Upgrade Plan for All {practiceLimitInfo.total} Qs →
+                </button>
+              </div>
+            )}
 
             {/* Modal Body */}
             {!examCompleted ? (() => {
@@ -1208,12 +1240,11 @@ export default function ExamBank() {
 
               return (
                 <div className="p-6 md:p-8 space-y-6 pb-24">
-                  {/* Progress bar & Top Quick Navigation Header */}
+                  {/* Progress bar & Header Nav */}
                   <div className="space-y-3 bg-slate-50/80 p-4 rounded-xl border border-slate-200/80">
                     <div className="flex flex-wrap justify-between items-center gap-2 text-xs font-bold text-slate-500">
                       <span>Question {currentQuestionIndex + 1} of {practiceExam.questions.length} ({Math.round(((currentQuestionIndex + 1) / practiceExam.questions.length) * 100)}%)</span>
 
-                      {/* Top Header Quick Nav Buttons */}
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
@@ -1221,7 +1252,6 @@ export default function ExamBank() {
                           disabled={currentQuestionIndex === 0}
                           onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
                           className="h-8 text-xs px-3 gap-1 shadow-2xs bg-white"
-                          title="Previous Question (Left Arrow)"
                         >
                           <ChevronLeft className="w-4 h-4" /> Previous
                         </Button>
@@ -1231,7 +1261,6 @@ export default function ExamBank() {
                             size="sm"
                             onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
                             className="h-8 text-xs px-3 bg-blue-600 hover:bg-blue-700 text-white gap-1 shadow-xs"
-                            title="Next Question (Right Arrow)"
                           >
                             Next <ChevronRight className="w-4 h-4" />
                           </Button>
@@ -1295,7 +1324,7 @@ export default function ExamBank() {
                       {bookmarked ? (
                         <>
                           <BookmarkCheck className="w-4 h-4 text-amber-600 fill-amber-500" />
-                          <span>Saved to Favorites</span>
+                          <span>Saved</span>
                         </>
                       ) : (
                         <>
@@ -1350,53 +1379,20 @@ export default function ExamBank() {
                         Clinical Rationale & Explanation
                       </span>
                       <p className="text-xs text-blue-950 leading-relaxed">
-                        {currentQ.explanation}
+                        {currentQ.explanation || 'Rationales provide clinical reasoning behind the correct therapeutic action.'}
                       </p>
                     </div>
                   )}
-
-                  {/* Sticky Navigation Footer - Always visible on screen without scrolling */}
-                  <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md pt-3 pb-3 px-4 sm:px-6 border-t border-slate-200/90 shadow-lg z-30 rounded-b-2xl flex justify-between items-center -mx-6 -mb-6 md:-mx-8 md:-mb-8">
-                    <Button
-                      variant="outline"
-                      disabled={currentQuestionIndex === 0}
-                      onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-                      className="gap-1.5 text-xs sm:text-sm font-semibold"
-                    >
-                      <ChevronLeft className="w-4 h-4" /> Previous
-                    </Button>
-
-                    <div className="text-xs font-semibold text-slate-500 hidden sm:block">
-                      Use <kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-mono text-[10px]">←</kbd> <kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-mono text-[10px]">→</kbd> arrow keys to navigate
-                    </div>
-
-                    {currentQuestionIndex < practiceExam.questions.length - 1 ? (
-                      <Button 
-                        onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 text-xs sm:text-sm font-bold shadow-sm"
-                      >
-                        Next Question <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    ) : (
-                      <Button 
-                        onClick={() => setExamCompleted(true)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 text-xs sm:text-sm font-extrabold shadow-sm"
-                      >
-                        Complete & View Score <Award className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
                 </div>
               );
             })() : (
-              /* Score Summary View */
-              <div className="p-8 text-center space-y-6">
-                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                  <Award className="w-10 h-10" />
+              /* Exam Completion Score Screen */
+              <div className="p-8 text-center space-y-6 my-auto">
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+                  <Award className="w-8 h-8" />
                 </div>
-
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-bold text-slate-900">Practice Exam Finished!</h3>
+                <div>
+                  <h3 className="text-2xl font-extrabold text-slate-900">Exam Session Completed!</h3>
                   <p className="text-sm text-slate-500">Here is your performance summary on {practiceExam.title}</p>
                 </div>
 
@@ -1495,4 +1491,3 @@ export default function ExamBank() {
     </div>
   );
 }
-

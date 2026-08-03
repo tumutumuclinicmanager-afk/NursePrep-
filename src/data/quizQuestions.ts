@@ -13,14 +13,16 @@ export const NURSING_UNITS = [
 
 export type NursingUnit = typeof NURSING_UNITS[number];
 
-export function normalizeExamCategory(mode?: string): 'NCK' | 'NCLEX' | 'HESI' | 'GED' | 'Custom' {
-  if (!mode) return 'Custom';
-  const m = mode.toUpperCase();
-  if (m.includes('NCK') || m.includes('KENYA') || m.includes('COUNCIL')) return 'NCK';
-  if (m.includes('NCLEX') || m.includes('RN') || m.includes('PN') || m.includes('NGN')) return 'NCLEX';
-  if (m.includes('HESI') || m.includes('ATI') || m.includes('TEAS')) return 'HESI';
-  if (m.includes('GED') || m.includes('FOUNDATION')) return 'GED';
-  return 'Custom';
+export function normalizeExamCategory(mode?: string): string {
+  if (!mode) return 'NCK';
+  const m = mode.trim();
+  const upper = m.toUpperCase();
+  if (upper.includes('NCK') || upper.includes('KENYA') || upper.includes('COUNCIL')) return 'NCK';
+  if (upper.includes('NCLEX') || upper.includes('NGN')) return 'NCLEX';
+  if (upper.includes('HESI')) return 'HESI';
+  if (upper.includes('GED')) return 'GED';
+  // Preserve custom mode/category name exactly (e.g. ATI TEAS, Prometric, Midwifery)
+  return m;
 }
 
 export const ALL_QUIZ_QUESTIONS: QuestionData[] = [

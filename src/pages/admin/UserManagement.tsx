@@ -1,69 +1,76 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, MoreVertical, Shield, GraduationCap, Users, RefreshCw } from 'lucide-react';
+import { UserPlus, Search, MoreVertical, Shield, GraduationCap, Users, RefreshCw, Crown, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { collection, addDoc, getDocs, query } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export default function UserManagement() {
-  const [activeTab, setActiveTab] = useState('lecturers');
+  const [activeTab, setActiveTab] = useState<'lecturers' | 'admins' | 'students'>('students');
   const [showAddModal, setShowAddModal] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({ name: '', email: '', password: '', role: '' });
 
-  useEffect(() => {
-    const fetchUsers = async () => {
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      let userList: any[] = [];
       try {
-        setLoading(true);
-        let userList: any[] = [];
-        try {
-          const q = query(collection(db, 'users'));
-          const querySnapshot = await getDocs(q);
-          userList = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-        } catch (dbErr) {
-          console.warn("Firestore fetch error, falling back to local storage:", dbErr);
-        }
-
-        // Default system admin accounts
-        const defaultUsers = [
-          { id: 'def-3', name: 'Godfrey Wangechi', email: 'wangechigodfrey77@gmail.com', role: 'Super Admin', status: 'Active', added: '2023-01-01' },
-          { id: 'def-4', name: 'System Admin', email: 'admin@nurseprep.com', role: 'Admin', status: 'Active', added: '2023-01-01' }
-        ];
-
-        // Seed Firestore if empty
-        if (userList.length === 0) {
-          for (const u of defaultUsers) {
-            try {
-              await addDoc(collection(db, 'users'), u);
-            } catch (e) {
-              console.warn("Failed to seed user to Firestore:", e);
-            }
-          }
-        }
-
-        // Retrieve local storage custom users
-        const localUsers = JSON.parse(localStorage.getItem('nurseprep_custom_users') || '[]');
-
-        // Combine into unified map keyed by email
-        const userMap = new Map<string, any>();
-        defaultUsers.forEach(u => userMap.set(u.email.toLowerCase(), u));
-        userList.forEach(u => u.email && userMap.set(u.email.toLowerCase(), u));
-        localUsers.forEach((u: any) => u.email && userMap.set(u.email.toLowerCase(), u));
-
-        setUsers(Array.from(userMap.values()));
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      } finally {
-        setLoading(false);
+        const q = query(collection(db, 'users'));
+        const querySnapshot = await getDocs(q);
+        userList = querySnapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        }));
+      } catch (dbErr) {
+        console.warn("Firestore fetch error, falling back to local storage:", dbErr);
       }
-    };
 
+      // Default system admin accounts
+      const defaultUsers = [
+        { id: 'def-3', name: 'Godfrey Wangechi', email: 'wangechigodfrey77@gmail.com', role: 'Super Admin', status: 'Active', added: '2023-01-01' },
+        { id: 'def-4', name: 'System Admin', email: 'admin@nurseprep.com', role: 'Admin', status: 'Active', added: '2023-01-01' }
+      ];
+
+      // Retrieve local storage custom users
+      const localUsers = JSON.parse(localStorage.getItem('nurseprep_custom_users') || '[]');
+
+      // Combine into unified map keyed by email
+      const userMap = new Map<string, any>();
+      defaultUsers.forEach(u => userMap.set(u.email.toLowerCase(), u));
+      userList.forEach(u => u.email && userMap.set(u.email.toLowerCase(), u));
+      localUsers.forEach((u: any) => u.email && userMap.set(u.email.toLowerCase(), u));
+
+      setUsers(Array.from(userMap.values()));
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchUsers();
   }, []);
+
+  const handleUpdateStudentPlan = async (userItem: any, newPlan: string) => {
+    if (!userItem.id) return;
+    setUpdatingUserId(userItem.id);
+    try {
+      await updateDoc(doc(db, 'users', userItem.id), {
+        subscriptionPlan: newPlan
+      });
+      setUsers(prev => prev.map(u => u.id === userItem.id ? { ...u, subscriptionPlan: newPlan } : u));
+    } catch (err) {
+      console.error("Error updating student plan:", err);
+      alert("Failed to update student subscription plan in Firestore.");
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
 
   const handleCreateUser = async () => {
     if (!formData.name || !formData.email || !formData.password) {
@@ -77,6 +84,7 @@ export default function UserManagement() {
       email: cleanEmail,
       role: formData.role || (activeTab === 'lecturers' ? 'Staff / Lecturer' : 'Admin'),
       status: 'Active',
+      subscriptionPlan: 'free',
       added: new Date().toISOString().split('T')[0]
     };
 
@@ -103,35 +111,60 @@ export default function UserManagement() {
 
     setShowAddModal(false);
     setFormData({ name: '', email: '', password: '', role: '' });
-    alert(`Lecturer/Staff account (${cleanEmail}) successfully created and saved! They can now log in using these credentials.`);
+    alert(`Account (${cleanEmail}) successfully created!`);
   };
 
   const lecturers = users.filter(u => u.role === 'Staff / Lecturer' || u.role?.toLowerCase().includes('staff') || u.role?.toLowerCase().includes('lecturer'));
   const admins = users.filter(u => u.role === 'Admin' || u.role === 'Super Admin' || u.role?.toLowerCase().includes('admin'));
-  const displayUsers = activeTab === 'lecturers' ? lecturers : admins;
+  const students = users.filter(u => !u.role || u.role === 'Student' || u.role?.toLowerCase().includes('student'));
+
+  let displayUsers = students;
+  if (activeTab === 'lecturers') displayUsers = lecturers;
+  if (activeTab === 'admins') displayUsers = admins;
+
+  const filteredDisplayUsers = displayUsers.filter(u => {
+    const q = searchQuery.toLowerCase();
+    return (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.subscriptionPlan || '').toLowerCase().includes(q);
+  });
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">User Management</h2>
-          <p className="text-slate-500 text-sm">Manage staff and admin accounts.</p>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">User & Subscription Management</h2>
+          <p className="text-slate-500 text-sm">Manage student accounts, active subscription plans, lecturers, and system administrators.</p>
         </div>
-        <Button onClick={() => setShowAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2">
-          <UserPlus className="w-4 h-4" />
-          Add New User
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={fetchUsers} disabled={loading} className="text-xs gap-1">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+          {activeTab !== 'students' && (
+            <Button onClick={() => setShowAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2">
+              <UserPlus className="w-4 h-4" />
+              Add New User
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="border-b border-slate-200 px-6 py-3 flex gap-6">
+          <button 
+            onClick={() => setActiveTab('students')}
+            className={`pb-3 font-bold text-sm border-b-2 transition-colors ${activeTab === 'students' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Students & Subscriptions ({students.length})
+            </div>
+          </button>
           <button 
             onClick={() => setActiveTab('lecturers')}
             className={`pb-3 font-bold text-sm border-b-2 transition-colors ${activeTab === 'lecturers' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
           >
             <div className="flex items-center gap-2">
               <GraduationCap className="w-4 h-4" />
-              Lecturers & Staff
+              Lecturers & Staff ({lecturers.length})
             </div>
           </button>
           <button 
@@ -140,7 +173,7 @@ export default function UserManagement() {
           >
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4" />
-              Administrators
+              Administrators ({admins.length})
             </div>
           </button>
         </div>
@@ -150,7 +183,9 @@ export default function UserManagement() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Search users..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, email, or subscription plan..." 
               className="w-full pl-10 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             />
           </div>
@@ -162,40 +197,79 @@ export default function UserManagement() {
               <tr>
                 <th className="px-6 py-4 border-b border-slate-200">User</th>
                 <th className="px-6 py-4 border-b border-slate-200">Role</th>
+                {activeTab === 'students' && (
+                  <th className="px-6 py-4 border-b border-slate-200">Subscription Plan</th>
+                )}
                 <th className="px-6 py-4 border-b border-slate-200">Status</th>
                 <th className="px-6 py-4 border-b border-slate-200">Added</th>
                 <th className="px-6 py-4 border-b border-slate-200 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {displayUsers.map((user, index) => (
-                <tr key={user.id || user.email || `user-${index}`} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                        {user.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-900">{user.name}</div>
-                        <div className="text-xs text-slate-500">{user.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-slate-600 font-medium">{user.role}</td>
-                  <td className="px-6 py-4">
-                    <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
-                      {user.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-500 text-xs">{user.added}</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button className="text-xs font-bold text-blue-600 hover:underline px-2 py-1">Reset Password</button>
-                      <button className="p-1 text-slate-400 hover:text-slate-600 rounded"><MoreVertical className="w-4 h-4" /></button>
-                    </div>
+              {filteredDisplayUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-slate-400 text-xs">
+                    No users found matching your query.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredDisplayUsers.map((user, index) => {
+                  const currentPlan = user.subscriptionPlan || 'free';
+
+                  return (
+                    <tr key={user.id || user.email || `user-${index}`} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
+                            {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-900">{user.name || 'Student Account'}</div>
+                            <div className="text-xs text-slate-500">{user.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-slate-600 font-medium">{user.role || 'Student'}</td>
+
+                      {activeTab === 'students' && (
+                        <td className="px-6 py-4">
+                          <select
+                            value={currentPlan}
+                            disabled={updatingUserId === user.id}
+                            onChange={(e) => handleUpdateStudentPlan(user, e.target.value)}
+                            className={`px-3 py-1 rounded-lg text-xs font-extrabold border outline-none cursor-pointer ${
+                              currentPlan === 'platinum' || currentPlan === 'master'
+                                ? 'bg-purple-100 text-purple-900 border-purple-300'
+                                : currentPlan === 'gold' || currentPlan === 'sure-pass'
+                                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                : currentPlan === 'basic' || currentPlan === 'silver'
+                                ? 'bg-slate-200 text-slate-800 border-slate-300'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            }`}
+                          >
+                            <option value="free">Free Tier (Public Access)</option>
+                            <option value="basic">Silver / Basic Plan ($64)</option>
+                            <option value="gold">Gold / Sure Pass Plan ($128)</option>
+                            <option value="platinum">Platinum / Master Plan ($199)</option>
+                          </select>
+                        </td>
+                      )}
+
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
+                          {user.status || 'Active'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-500 text-xs">{user.added || '2026-08-01'}</td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button className="text-xs font-bold text-blue-600 hover:underline px-2 py-1">Details</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

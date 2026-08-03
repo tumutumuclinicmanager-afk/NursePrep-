@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { QuestionData } from '@/types';
 import { ALL_QUIZ_QUESTIONS, NURSING_UNITS, NursingUnit } from '@/data/quizQuestions';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useNavigate } from 'react-router-dom';
 
@@ -48,6 +48,38 @@ export default function QuizGeneratorPage({
   const [showRationale, setShowRationale] = useState<Record<number, boolean>>({});
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [isSavingScore, setIsSavingScore] = useState<boolean>(false);
+  const [dbQuestions, setDbQuestions] = useState<QuestionData[]>([]);
+
+  React.useEffect(() => {
+    const fetchDbQuestions = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'questions')));
+        const items: QuestionData[] = [];
+        snap.docs.forEach(docSnap => {
+          const d = docSnap.data();
+          items.push({
+            id: docSnap.id,
+            questionTypeId: d.questionTypeId || 'single_choice',
+            questionTypeLabel: d.questionTypeLabel || 'Single Choice',
+            examMode: d.examMode || 'NCK',
+            unitDomain: d.unitDomain || 'Medical-Surgical Nursing',
+            difficulty: d.difficulty || 'Medium',
+            questionStem: d.questionStem || d.question || '',
+            options: d.options ? d.options.map((o: any, idx: number) => ({
+              id: typeof o === 'object' ? o.id || `opt-${idx}` : `opt-${idx}`,
+              text: typeof o === 'object' ? o.text : o,
+              isCorrect: typeof o === 'object' ? !!o.isCorrect : idx === 0
+            })) : [],
+            rationale: d.rationale || d.explanation || ''
+          });
+        });
+        setDbQuestions(items);
+      } catch (err) {
+        console.warn("Could not fetch extra DB questions for quiz generator:", err);
+      }
+    };
+    fetchDbQuestions();
+  }, []);
 
   // Keyboard Arrow Shortcut Navigation
   React.useEffect(() => {
@@ -66,7 +98,7 @@ export default function QuizGeneratorPage({
 
   // Start Quiz Function
   const handleStartQuiz = () => {
-    let filtered = [...ALL_QUIZ_QUESTIONS];
+    let filtered = [...ALL_QUIZ_QUESTIONS, ...dbQuestions];
 
     if (selectedUnit !== 'All') {
       filtered = filtered.filter(q => q.unitDomain === selectedUnit);
