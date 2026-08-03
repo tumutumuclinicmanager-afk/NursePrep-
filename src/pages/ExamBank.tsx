@@ -489,17 +489,53 @@ export default function ExamBank() {
     try {
       if (auth.currentUser) {
         const userEmail = auth.currentUser.email || auth.currentUser.uid;
+        const normalizedEmail = (auth.currentUser.email || '').toLowerCase();
         
-        // Fetch User Plan
+        // 1. Check localStorage cache first for immediate upgraded plan rights
+        let cachedPlan = '';
+        if (normalizedEmail) {
+          cachedPlan = localStorage.getItem(`nurseprep_plan_${normalizedEmail}`) || '';
+        }
+        if (!cachedPlan) {
+          cachedPlan = localStorage.getItem('nurseprep_current_user_plan') || '';
+        }
+        
+        if (cachedPlan) {
+          const plan = cachedPlan.toLowerCase();
+          if (plan.includes('plat') || plan.includes('master')) setUserSubscriptionPlan('platinum');
+          else if (plan.includes('gold') || plan.includes('sure')) setUserSubscriptionPlan('gold');
+          else if (plan.includes('basic') || plan.includes('silver')) setUserSubscriptionPlan('basic');
+          else setUserSubscriptionPlan('free');
+        }
+
+        // 2. Fetch User Plan from Firestore (by UID or email)
         try {
+          let userPlanFound = '';
           const userSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
           if (userSnap.exists()) {
             const uData = userSnap.data();
-            const plan = (uData.subscriptionPlan || uData.plan || 'free').toLowerCase();
+            userPlanFound = (uData.subscriptionPlan || uData.plan || '').toLowerCase();
+          } else if (normalizedEmail) {
+            const qUser = query(collection(db, 'users'), where('email', '==', normalizedEmail));
+            const uSnap = await getDocs(qUser);
+            if (!uSnap.empty) {
+              const uData = uSnap.docs[0].data();
+              userPlanFound = (uData.subscriptionPlan || uData.plan || '').toLowerCase();
+            }
+          }
+
+          if (userPlanFound) {
+            const plan = userPlanFound;
             if (plan.includes('plat') || plan.includes('master')) setUserSubscriptionPlan('platinum');
             else if (plan.includes('gold') || plan.includes('sure')) setUserSubscriptionPlan('gold');
             else if (plan.includes('basic') || plan.includes('silver')) setUserSubscriptionPlan('basic');
             else setUserSubscriptionPlan('free');
+            
+            // Sync cache
+            localStorage.setItem('nurseprep_current_user_plan', userSubscriptionPlan);
+            if (normalizedEmail) {
+              localStorage.setItem(`nurseprep_plan_${normalizedEmail}`, userSubscriptionPlan);
+            }
           }
         } catch (uErr) {
           console.warn("Could not fetch user subscription plan:", uErr);

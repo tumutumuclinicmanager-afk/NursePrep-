@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, MoreVertical, Shield, GraduationCap, Users, RefreshCw, Crown, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { collection, addDoc, getDocs, query, doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs, query, doc, updateDoc, where } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
 
 export default function UserManagement() {
   const [activeTab, setActiveTab] = useState<'lecturers' | 'admins' | 'students'>('students');
@@ -57,16 +57,53 @@ export default function UserManagement() {
   }, []);
 
   const handleUpdateStudentPlan = async (userItem: any, newPlan: string) => {
-    if (!userItem.id) return;
-    setUpdatingUserId(userItem.id);
+    if (!userItem.id && !userItem.email) return;
+    setUpdatingUserId(userItem.id || userItem.email);
     try {
-      await updateDoc(doc(db, 'users', userItem.id), {
-        subscriptionPlan: newPlan
-      });
-      setUsers(prev => prev.map(u => u.id === userItem.id ? { ...u, subscriptionPlan: newPlan } : u));
+      // 1. Update Firestore by ID if valid Firestore ID
+      if (userItem.id && !userItem.id.startsWith('def-') && !userItem.id.startsWith('local-')) {
+        try {
+          await updateDoc(doc(db, 'users', userItem.id), {
+            subscriptionPlan: newPlan
+          });
+        } catch (e) {
+          console.warn("Could not update by id, trying email query:", e);
+        }
+      }
+
+      // 2. Also try querying by email in Firestore users
+      if (userItem.email) {
+        try {
+          const q = query(collection(db, 'users'), where('email', '==', userItem.email.trim().toLowerCase()));
+          const snap = await getDocs(q);
+          for (const docSnap of snap.docs) {
+            await updateDoc(doc(db, 'users', docSnap.id), {
+              subscriptionPlan: newPlan
+            });
+          }
+        } catch (e) {
+          console.warn("Could not query/update by email in Firestore:", e);
+        }
+      }
+
+      // 3. Update localStorage custom users
+      const localUsers = JSON.parse(localStorage.getItem('nurseprep_custom_users') || '[]');
+      const updatedLocal = localUsers.map((u: any) => u.email?.toLowerCase() === userItem.email?.toLowerCase() ? { ...u, subscriptionPlan: newPlan } : u);
+      localStorage.setItem('nurseprep_custom_users', JSON.stringify(updatedLocal));
+
+      // 4. Cache plan in localStorage for immediate access
+      if (userItem.email) {
+        localStorage.setItem(`nurseprep_plan_${userItem.email.trim().toLowerCase()}`, newPlan);
+        if (auth.currentUser?.email?.toLowerCase() === userItem.email.trim().toLowerCase()) {
+          localStorage.setItem('nurseprep_current_user_plan', newPlan);
+        }
+      }
+
+      setUsers(prev => prev.map(u => (u.id === userItem.id || u.email?.toLowerCase() === userItem.email?.toLowerCase()) ? { ...u, subscriptionPlan: newPlan } : u));
+      alert(`Successfully upgraded ${userItem.name || userItem.email} to ${newPlan.toUpperCase()} plan! They now have immediate full access.`);
     } catch (err) {
       console.error("Error updating student plan:", err);
-      alert("Failed to update student subscription plan in Firestore.");
+      alert("Failed to update student subscription plan.");
     } finally {
       setUpdatingUserId(null);
     }
