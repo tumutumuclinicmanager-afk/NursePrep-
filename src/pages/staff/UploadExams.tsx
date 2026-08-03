@@ -1,11 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, Edit3, Database, Layers, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import QuestionBuilder from '@/components/staff/QuestionBuilder';
 import QuestionRepository from '@/components/staff/QuestionRepository';
 import ExamPublisher from '@/components/staff/ExamPublisher';
+
+const DEFAULT_EXAM_TYPES = [
+  'ATI TEAS',
+  'HESI A2',
+  'ACCUPLACER',
+  'GED',
+  'HISET',
+  'NCK',
+  'NCLEX-RN',
+  'NCLEX-PN',
+  'ATI RN',
+  'ATI LPN',
+  'HESI RN',
+  'HESI LPN',
+  'Examplify RN',
+  'Examplify LPN',
+  'ATI Exit Exam',
+  'HESI Exit Exam',
+  'Examplify Exit Exam'
+];
 
 export default function UploadExams() {
   const [activeTab, setActiveTab] = useState<'builder' | 'pdf' | 'repository' | 'publisher'>('publisher');
@@ -18,6 +38,25 @@ export default function UploadExams() {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [extractedQuestions, setExtractedQuestions] = useState<any[]>([]);
   const [examTitle, setExamTitle] = useState('');
+  const [selectedExamMode, setSelectedExamMode] = useState('NCLEX-RN');
+  const [customExamModes, setCustomExamModes] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchModes = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'exam_modes')));
+        setCustomExamModes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        console.warn('Error fetching exam modes:', e);
+      }
+    };
+    fetchModes();
+  }, []);
+
+  const ALL_COMBINED_EXAM_TYPES = [
+    ...DEFAULT_EXAM_TYPES,
+    ...customExamModes.map(m => m.name)
+  ];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -74,14 +113,18 @@ export default function UploadExams() {
         title: examTitle || 'Untitled Exam',
         questions: extractedQuestions,
         createdAt: new Date().toISOString(),
-        category: 'Custom Upload',
+        category: selectedExamMode,
+        domain: 'General Nursing',
+        requiredPlan: 'free',
+        questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 },
+        isPublished: true,
       }));
       await addDoc(collection(db, 'exams'), examDoc);
 
       // Also save individual questions to questions bank
       for (const q of extractedQuestions) {
         const questionDoc = JSON.parse(JSON.stringify({
-          examMode: 'NCLEX-RN',
+          examMode: selectedExamMode,
           unitDomain: 'General Nursing',
           questionTypeId: 'single_choice',
           questionTypeLabel: 'Single Choice',
@@ -99,7 +142,7 @@ export default function UploadExams() {
         await addDoc(collection(db, 'questions'), questionDoc);
       }
 
-      alert('Exam and extracted questions successfully saved to bank!');
+      alert('Exam and extracted questions successfully saved to bank under ' + selectedExamMode + '!');
       setFile(null);
       setExtractedQuestions([]);
       setUploadStatus('idle');
@@ -257,15 +300,29 @@ export default function UploadExams() {
 
           {extractedQuestions.length > 0 && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center gap-4">
-                <h3 className="font-bold text-slate-800 whitespace-nowrap">Extracted Questions Preview</h3>
-                <input 
-                  type="text" 
-                  value={examTitle}
-                  onChange={(e) => setExamTitle(e.target.value)}
-                  placeholder="Exam Title" 
-                  className="px-3 py-1.5 border border-slate-200 rounded text-sm w-full max-w-xs outline-none focus:border-blue-500"
-                />
+              <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-slate-800 whitespace-nowrap">Extracted Questions Preview</h3>
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold">{extractedQuestions.length} Questions</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <select
+                    value={selectedExamMode}
+                    onChange={(e) => setSelectedExamMode(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-200 rounded text-xs font-semibold bg-white text-slate-800 outline-none focus:border-blue-500"
+                  >
+                    {ALL_COMBINED_EXAM_TYPES.map(mode => (
+                      <option key={mode} value={mode}>{mode}</option>
+                    ))}
+                  </select>
+                  <input 
+                    type="text" 
+                    value={examTitle}
+                    onChange={(e) => setExamTitle(e.target.value)}
+                    placeholder="Exam Name (e.g. Med-Surg Final 2026)" 
+                    className="px-3 py-1.5 border border-slate-200 rounded text-xs font-medium w-full sm:w-60 outline-none focus:border-blue-500"
+                  />
+                </div>
               </div>
               <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
                 {extractedQuestions.map((q, index) => (
