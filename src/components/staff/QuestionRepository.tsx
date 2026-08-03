@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Trash2, Tag, BookOpen, Layers, RefreshCw, FileText, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { collection, getDocs, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, query, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { QuestionData } from '@/types';
 
+const DEFAULT_EXAM_MODES = [
+  'ATI TEAS', 'HESI A2', 'ACCUPLACER', 'GED', 'HISET', 
+  'NCK', 'NCLEX-RN', 'NCLEX-PN', 'ATI RN', 'ATI LPN', 
+  'HESI RN', 'HESI LPN', 'Examplify RN', 'Examplify LPN', 
+  'ATI Exit Exam', 'HESI Exit Exam', 'Examplify Exit Exam'
+];
+
 export default function QuestionRepository({ refreshTrigger }: { refreshTrigger?: number }) {
   const [questions, setQuestions] = useState<QuestionData[]>([]);
+  const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterExamMode, setFilterExamMode] = useState<string>('All');
@@ -14,25 +22,37 @@ export default function QuestionRepository({ refreshTrigger }: { refreshTrigger?
   const [filterType, setFilterType] = useState<string>('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const fetchQuestions = async () => {
+  // Assign / Move Modal State
+  const [assigningQuestion, setAssigningQuestion] = useState<QuestionData | null>(null);
+  const [targetExamMode, setTargetExamMode] = useState<string>('NCLEX-RN');
+  const [targetExamId, setTargetExamId] = useState<string>('');
+  const [isAssigning, setIsAssigning] = useState<boolean>(false);
+
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const q = query(collection(db, 'questions'));
-      const snapshot = await getDocs(q);
-      const list = snapshot.docs.map(docSnap => ({
+      const qSnap = await getDocs(query(collection(db, 'questions')));
+      const qList = qSnap.docs.map(docSnap => ({
         id: docSnap.id,
         ...docSnap.data()
       })) as QuestionData[];
-      setQuestions(list);
+      setQuestions(qList);
+
+      const eSnap = await getDocs(query(collection(db, 'exams')));
+      const eList = eSnap.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data()
+      }));
+      setExams(eList);
     } catch (err) {
-      console.error('Error fetching question repository:', err);
+      console.error('Error fetching question repository data:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchQuestions();
+    fetchData();
   }, [refreshTrigger]);
 
   const handleDeleteQuestion = async (id: string) => {
@@ -43,6 +63,59 @@ export default function QuestionRepository({ refreshTrigger }: { refreshTrigger?
     } catch (err) {
       console.error('Failed to delete question:', err);
       alert('Failed to delete question from database.');
+    }
+  };
+
+  const handleOpenAssignModal = (q: QuestionData) => {
+    setAssigningQuestion(q);
+    setTargetExamMode(q.examMode || 'NCLEX-RN');
+    setTargetExamId('');
+  };
+
+  const handleConfirmAssign = async () => {
+    if (!assigningQuestion || !assigningQuestion.id) return;
+    setIsAssigning(true);
+    try {
+      // 1. Update question doc with new examMode
+      await updateDoc(doc(db, 'questions', assigningQuestion.id), {
+        examMode: targetExamMode
+      });
+
+      // 2. If specific exam selected, append or update question in that exam's questions array
+      if (targetExamId) {
+        const targetExam = exams.find(e => e.id === targetExamId);
+        if (targetExam) {
+          const currentQuestions = targetExam.questions || [];
+          const questionPayload = {
+            id: assigningQuestion.id,
+            question: assigningQuestion.questionStem,
+            options: assigningQuestion.options ? assigningQuestion.options.map((o: any) => typeof o === 'string' ? o : o.text) : ['Option A', 'Option B', 'Option C', 'Option D'],
+            correctAnswer: assigningQuestion.options ? (assigningQuestion.options.find((o: any) => o.isCorrect)?.text || assigningQuestion.options[0]?.text) : 'Option A',
+            explanation: assigningQuestion.rationale || ''
+          };
+
+          const existingIdx = currentQuestions.findIndex((item: any) => item.id === assigningQuestion.id);
+          let updatedQuestions = [...currentQuestions];
+          if (existingIdx >= 0) {
+            updatedQuestions[existingIdx] = questionPayload;
+          } else {
+            updatedQuestions.push(questionPayload);
+          }
+
+          await updateDoc(doc(db, 'exams', targetExamId), {
+            questions: updatedQuestions
+          });
+        }
+      }
+
+      alert(`Question successfully moved to Exam Mode "${targetExamMode}"${targetExamId ? ' and assigned to specific exam!' : '!'}`);
+      setAssigningQuestion(null);
+      fetchData();
+    } catch (err: any) {
+      console.error('Error assigning question:', err);
+      alert(`Failed to assign question: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -70,12 +143,12 @@ export default function QuestionRepository({ refreshTrigger }: { refreshTrigger?
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
           <div>
             <h3 className="font-bold text-slate-900 text-lg">Lecturer Question Bank ({filteredQuestions.length})</h3>
-            <p className="text-slate-500 text-xs">Search, filter, and inspect published questions across exam modes</p>
+            <p className="text-slate-500 text-xs">Search, filter, move, and assign published questions across exam modes & specific exams</p>
           </div>
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={fetchQuestions} 
+            onClick={fetchData} 
             disabled={loading}
             className="text-xs gap-1"
           >
@@ -189,6 +262,13 @@ export default function QuestionRepository({ refreshTrigger }: { refreshTrigger?
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => handleOpenAssignModal(q)}
+                      className="text-xs font-bold text-indigo-700 hover:text-indigo-900 flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                      title="Move to Exam Mode & Specific Exam"
+                    >
+                      <Layers className="w-3.5 h-3.5" /> Move to Exam
+                    </button>
                     <button 
                       onClick={() => setExpandedId(isExpanded ? null : (q.id || null))}
                       className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 px-2 py-1 rounded hover:bg-blue-50"
@@ -374,6 +454,85 @@ export default function QuestionRepository({ refreshTrigger }: { refreshTrigger?
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Move / Assign Modal */}
+      {assigningQuestion && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl border border-slate-200">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                <Layers className="w-5 h-5 text-blue-600" /> Move Question to Exam & Mode
+              </h3>
+              <button 
+                onClick={() => setAssigningQuestion(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Question Stem:</span>
+                <p className="text-xs text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-200 line-clamp-3">
+                  {assigningQuestion.questionStem}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Target Exam Mode / Category</label>
+                <select 
+                  value={targetExamMode}
+                  onChange={(e) => setTargetExamMode(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-blue-500 outline-none"
+                >
+                  {DEFAULT_EXAM_MODES.map(mode => (
+                    <option key={mode} value={mode}>{mode}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Target Specific Exam (Optional)</label>
+                <select 
+                  value={targetExamId}
+                  onChange={(e) => setTargetExamId(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">-- None (Update Exam Mode only) --</option>
+                  {exams.map(ex => (
+                    <option key={ex.id} value={ex.id}>
+                      {ex.title} ({ex.category || 'General'})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Selecting a specific exam will append or sync this question directly into that exam's question bundle in Firestore.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setAssigningQuestion(null)}
+                disabled={isAssigning}
+              >
+                Cancel
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={handleConfirmAssign}
+                disabled={isAssigning}
+                className="bg-blue-600 hover:bg-blue-500 text-white font-bold"
+              >
+                {isAssigning ? 'Moving...' : 'Save & Move Question'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
