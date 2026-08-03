@@ -18,7 +18,18 @@ import {
   Shield,
   Zap,
   Check,
-  Info
+  Info,
+  Stethoscope,
+  Heart,
+  Pill,
+  Brain,
+  Users,
+  Sparkles,
+  BarChart2,
+  PieChart,
+  CheckCircle2,
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -34,6 +45,18 @@ import {
   UserBadgeState, 
   ICON_MAP 
 } from '@/lib/badges';
+
+// Unit themes mapping for visual icons and badges
+const UNIT_THEMES: Record<string, { icon: any; color: string; bg: string; border: string; bar: string }> = {
+  'Medical-Surgical Nursing': { icon: Stethoscope, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200', bar: 'bg-rose-500' },
+  'Maternal & Newborn Health': { icon: Heart, color: 'text-pink-600', bg: 'bg-pink-50', border: 'border-pink-200', bar: 'bg-pink-500' },
+  'Pediatric Nursing': { icon: Sparkles, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', bar: 'bg-amber-500' },
+  'Pharmacology & Parenteral Therapies': { icon: Pill, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: 'bg-emerald-500' },
+  'Psychiatric & Mental Health': { icon: Brain, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200', bar: 'bg-purple-500' },
+  'Community & Public Health': { icon: Users, color: 'text-teal-600', bg: 'bg-teal-50', border: 'border-teal-200', bar: 'bg-teal-500' },
+  'Nursing Fundamentals & Leadership': { icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', bar: 'bg-blue-500' },
+  'Critical Care & Emergency Nursing': { icon: Zap, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200', bar: 'bg-orange-500' },
+};
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -76,11 +99,30 @@ export default function StudentDashboard() {
       const avgScore = data.length > 0 ? Math.round(data.reduce((acc, curr) => acc + (curr.score || 0), 0) / data.length) : 0;
       const userXp = questionsCount * 10 + data.length * 50;
 
+      // Compute overall mastery
+      let totalAttempted = 0;
+      let totalCorrect = 0;
+      data.forEach(item => {
+        if (item.unitBreakdown) {
+          Object.values(item.unitBreakdown).forEach((u: any) => {
+            totalAttempted += u.total || 0;
+            totalCorrect += u.correct || 0;
+          });
+        } else {
+          const tot = item.totalQuestions || 0;
+          const corr = item.correctQuestions ?? Math.round(((item.score || 0) / 100) * tot);
+          totalAttempted += tot;
+          totalCorrect += corr;
+        }
+      });
+      const overallMastery = totalAttempted > 0 ? Math.round((totalCorrect / totalAttempted) * 100) : avgScore;
+
       const updatedStats = {
         questionsAnswered: questionsCount,
         averageScore: avgScore,
         streak: realStreak,
-        xp: userXp
+        xp: userXp,
+        overallMastery
       };
 
       setStats(updatedStats);
@@ -144,36 +186,268 @@ export default function StudentDashboard() {
 
   const maxQuestionsInWeek = Math.max(...weeklyBarData.map(d => d.totalQuestions), 10);
 
+  // Compute Per-Unit Performance Metrics
+  const unitMetrics = NURSING_UNITS.map(unitName => {
+    let attempted = 0;
+    let correct = 0;
+
+    history.forEach(item => {
+      if (item.unitBreakdown && item.unitBreakdown[unitName]) {
+        attempted += item.unitBreakdown[unitName].total || 0;
+        correct += item.unitBreakdown[unitName].correct || 0;
+      } else if (item.category === unitName) {
+        const tot = item.totalQuestions || 0;
+        const corr = item.correctQuestions ?? Math.round(((item.score || 0) / 100) * tot);
+        attempted += tot;
+        correct += corr;
+      } else if (!item.category || item.category === 'All' || item.category === 'All Units') {
+        const tot = Math.round((item.totalQuestions || 0) / NURSING_UNITS.length);
+        const corr = Math.round((item.correctQuestions ?? Math.round(((item.score || 0) / 100) * (item.totalQuestions || 0))) / NURSING_UNITS.length);
+        attempted += tot;
+        correct += corr;
+      }
+    });
+
+    const mastery = attempted > 0 ? Math.min(100, Math.round((correct / attempted) * 100)) : 0;
+
+    let status: 'Mastered' | 'Proficient' | 'Developing' | 'Needs Review' | 'Not Started' = 'Not Started';
+    if (attempted > 0) {
+      if (mastery >= 80) status = 'Mastered';
+      else if (mastery >= 70) status = 'Proficient';
+      else if (mastery >= 50) status = 'Developing';
+      else status = 'Needs Review';
+    }
+
+    const theme = UNIT_THEMES[unitName] || { icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', bar: 'bg-blue-500' };
+
+    return {
+      unitName,
+      attempted,
+      correct,
+      mastery,
+      status,
+      theme
+    };
+  });
+
+  const totalAttemptedAll = unitMetrics.reduce((acc, u) => acc + u.attempted, 0);
+  const totalCorrectAll = unitMetrics.reduce((acc, u) => acc + u.correct, 0);
+  const overallMastery = totalAttemptedAll > 0
+    ? Math.round((totalCorrectAll / totalAttemptedAll) * 100)
+    : (stats.averageScore || 0);
+
+  const masteredUnitsCount = unitMetrics.filter(u => u.status === 'Mastered').length;
+
+  let readinessBadge = { label: 'Beginner Readiness', color: 'bg-slate-100 text-slate-700 border-slate-300' };
+  if (overallMastery >= 85 && totalAttemptedAll >= 20) {
+    readinessBadge = { label: 'NCLEX Board Ready', color: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold' };
+  } else if (overallMastery >= 75) {
+    readinessBadge = { label: 'High Competency (On Track)', color: 'bg-blue-100 text-blue-800 border-blue-300 font-bold' };
+  } else if (overallMastery >= 60) {
+    readinessBadge = { label: 'Moderate Proficiency', color: 'bg-amber-100 text-amber-800 border-amber-300 font-bold' };
+  } else if (totalAttemptedAll > 0) {
+    readinessBadge = { label: 'Developing Competency', color: 'bg-orange-100 text-orange-800 border-orange-300 font-bold' };
+  }
+
+  const unlockedCount = evaluatedBadges.filter(b => b.unlocked).length;
+
   const filteredBadgesModalList = evaluatedBadges.filter(b => {
     if (badgeFilter === 'unlocked') return b.unlocked;
     if (badgeFilter === 'locked') return !b.unlocked;
     return true;
   });
 
-  const unlockedCount = evaluatedBadges.filter(b => b.unlocked).length;
+  const handleLaunchUnitQuiz = (unitName: string) => {
+    setSelectedUnit(unitName);
+    setShowQuizModal(true);
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
       {/* Top Stats Row */}
       {[
-        { title: 'Questions Answered', value: stats.questionsAnswered.toString(), icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { title: 'Average Score', value: `${stats.averageScore}%`, icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { title: 'Study Streak', value: `${stats.streak} Days`, icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50' },
-        { title: 'Total XP', value: stats.xp.toString(), icon: Star, color: 'text-purple-600', bg: 'bg-purple-50' }
+        { title: 'Questions Attempted', value: (totalAttemptedAll || stats.questionsAnswered).toString(), subtitle: 'Across All Units', icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { title: 'Overall NCLEX Mastery', value: `${overallMastery}%`, subtitle: `${masteredUnitsCount} of ${NURSING_UNITS.length} Units Mastered`, icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { title: 'Badges Attained', value: `${unlockedCount} / ${evaluatedBadges.length}`, subtitle: 'Achievements Unlocked', icon: Award, color: 'text-amber-600', bg: 'bg-amber-50' },
+        { title: 'Study Streak', value: `${stats.streak} Days`, subtitle: `${stats.xp} XP Earned`, icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50' }
       ].map((stat, i) => (
-        <div key={i} className="col-span-1 md:col-span-6 lg:col-span-3 bg-white p-4 rounded-xl border border-slate-200 flex items-center gap-4 shadow-xs">
-          <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+        <div key={i} className="col-span-1 md:col-span-6 lg:col-span-3 bg-white p-4.5 rounded-xl border border-slate-200 flex items-center gap-4 shadow-xs hover:border-blue-200 transition-colors">
+          <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center flex-shrink-0 shadow-2xs`}>
             <stat.icon className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
-            <p className="text-xs text-slate-500 uppercase font-bold tracking-tight">{stat.title}</p>
+            <p className="text-2xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
+            <p className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">{stat.title}</p>
+            <p className="text-[10px] text-slate-500 font-medium">{stat.subtitle}</p>
           </div>
         </div>
       ))}
 
       {/* Main Body Left */}
       <div className="col-span-1 md:col-span-8 flex flex-col gap-6">
+        
+        {/* Overall NCLEX Mastery & Readiness Hero Section */}
+        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-950 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden border border-slate-800">
+          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div className="space-y-3 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-xs px-3 py-1 rounded-full border ${readinessBadge.color}`}>
+                  {readinessBadge.label}
+                </span>
+                <span className="text-xs font-semibold text-slate-300 bg-white/10 px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Saunders NCLEX-RN Standard
+                </span>
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-extrabold text-white tracking-tight">
+                  Overall Domain Mastery: <span className="text-blue-400">{overallMastery}%</span>
+                </h2>
+                <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+                  Track your progress across all 8 NCLEX nursing specialty domains. Increase your mastery percentage by practicing targeted quizzes in weak units.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-4 text-xs text-slate-300 pt-1">
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Attempted</span>
+                  <strong className="text-white text-base font-bold">{totalAttemptedAll} Questions</strong>
+                </div>
+                <div className="w-px h-8 bg-slate-700" />
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Correct</span>
+                  <strong className="text-emerald-400 text-base font-bold">{totalCorrectAll} Correct</strong>
+                </div>
+                <div className="w-px h-8 bg-slate-700" />
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Units Mastered</span>
+                  <strong className="text-amber-400 text-base font-bold">{masteredUnitsCount} / {NURSING_UNITS.length}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Overall Gauge Visual */}
+            <div className="flex flex-col items-center justify-center shrink-0 bg-white/5 border border-white/10 rounded-xl p-4 sm:w-44 text-center">
+              <div className="relative w-20 h-20 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                  <path
+                    className="text-slate-700 stroke-current"
+                    strokeWidth="3.5"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <path
+                    className="text-blue-400 stroke-current transition-all duration-1000 ease-out"
+                    strokeDasharray={`${overallMastery}, 100`}
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
+                <div className="absolute flex flex-col items-center justify-center">
+                  <span className="text-lg font-extrabold text-white">{overallMastery}%</span>
+                </div>
+              </div>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-300 mt-2">Overall Accuracy</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Performance Metrics per Unit Grid */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-blue-600" />
+                Performance Metrics per Nursing Unit
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Questions attempted, correct answers, and mastery status for all 8 NCLEX specialty units.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-medium">
+                Active Domains: <strong className="text-slate-900 font-bold">{NURSING_UNITS.length}</strong>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {unitMetrics.map((unit, idx) => {
+              const IconComp = unit.theme.icon;
+              
+              let statusStyle = 'bg-slate-100 text-slate-600 border-slate-200';
+              if (unit.status === 'Mastered') statusStyle = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+              else if (unit.status === 'Proficient') statusStyle = 'bg-blue-100 text-blue-800 border-blue-300';
+              else if (unit.status === 'Developing') statusStyle = 'bg-amber-100 text-amber-800 border-amber-300';
+              else if (unit.status === 'Needs Review') statusStyle = 'bg-rose-100 text-rose-800 border-rose-300';
+
+              return (
+                <div 
+                  key={idx}
+                  className="p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-xs transition-all bg-white flex flex-col justify-between space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-xl ${unit.theme.bg} ${unit.theme.color} flex items-center justify-center shrink-0 border ${unit.theme.border}`}>
+                        <IconComp className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs leading-snug">{unit.unitName}</h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${statusStyle}`}>
+                            {unit.status}
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-500">
+                            {unit.attempted} Attempted
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-lg font-extrabold text-slate-900">{unit.mastery}%</span>
+                      <span className="text-[10px] block font-medium text-slate-400">Mastery</span>
+                    </div>
+                  </div>
+
+                  {/* Visual Progress Bar */}
+                  <div className="space-y-1">
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          unit.mastery >= 80 ? 'bg-emerald-500' :
+                          unit.mastery >= 70 ? 'bg-blue-500' :
+                          unit.mastery >= 50 ? 'bg-amber-500' :
+                          unit.attempted > 0 ? 'bg-rose-500' : 'bg-slate-300'
+                        }`}
+                        style={{ width: `${unit.attempted > 0 ? unit.mastery : 0}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] text-slate-500 font-medium">
+                      <span>{unit.correct} Correct of {unit.attempted} Total</span>
+                      <span>{unit.attempted > 0 ? `${unit.mastery}% Accuracy` : 'Not Attempted Yet'}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    onClick={() => handleLaunchUnitQuiz(unit.unitName)}
+                    className="w-full py-1.5 px-3 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <span>Practice Unit</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Progress Visualization Graph */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
@@ -250,20 +524,20 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* Gamification: Dynamic Badges & Leaderboard */}
+        {/* Gamification: Dynamic Badges Showcase & Leaderboard */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                   <Award className="w-5 h-5 text-amber-500" />
-                  Recent Badges ({unlockedCount} Unlocked)
+                  Badges Attained ({unlockedCount} / {evaluatedBadges.length})
                 </h3>
                 <button
                   onClick={() => setShowAllBadgesModal(true)}
                   className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
                 >
-                  View All
+                  Catalog &rarr;
                 </button>
               </div>
 
@@ -321,7 +595,7 @@ export default function StudentDashboard() {
                 onClick={() => setShowAllBadgesModal(true)}
                 className="text-[11px] font-bold text-blue-600 hover:underline"
               >
-                Streak Badges &rarr;
+                All Badges &rarr;
               </button>
             </div>
           </div>

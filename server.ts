@@ -67,6 +67,9 @@ async function startServer() {
         : "medium";
 
       const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.warn("GEMINI_API_KEY is missing from server environment variables.");
+      }
       const ai = new GoogleGenAI({ 
         apiKey: apiKey || "dummy_key",
         httpOptions: {
@@ -86,7 +89,7 @@ async function startServer() {
       Do not include markdown blocks like \`\`\`json. Just the array.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json"
@@ -122,9 +125,12 @@ async function startServer() {
         return;
       }
 
-      const apiKey = process.env.GEMINI_API_KEY || "dummy_key";
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.warn("GEMINI_API_KEY is missing from server environment variables.");
+      }
       const ai = new GoogleGenAI({
-        apiKey,
+        apiKey: apiKey || "dummy_key",
         httpOptions: {
           headers: {
             'User-Agent': 'aistudio-build',
@@ -174,7 +180,7 @@ Key guidelines:
       });
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: formattedContents,
         config: {
           systemInstruction,
@@ -216,8 +222,18 @@ Key guidelines:
         text = req.file.buffer.toString('utf-8');
       }
       
-      const apiKey = process.env.GEMINI_API_KEY || "dummy_key";
-      const ai = new GoogleGenAI({ apiKey });
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.warn("GEMINI_API_KEY is missing from server environment variables.");
+      }
+      const ai = new GoogleGenAI({
+        apiKey: apiKey || "dummy_key",
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
       const prompt = `Extract nursing exam questions from the following text. 
       Return ONLY a JSON array of objects, where each object has:
       "question" (string), 
@@ -230,7 +246,7 @@ Key guidelines:
       Do not include markdown blocks like \`\`\`json. Just the array.`;
       
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json"

@@ -18,7 +18,7 @@ export default function StudyAssistantPage() {
               Smart AI Study Assistant
             </h1>
             <p className="text-slate-300 text-xs max-w-2xl leading-relaxed">
-              Powered by Gemini 3.6 Flash. Ask complex clinical nursing questions, generate custom NCLEX study flashcards, request memory mnemonics, or reviewSaunders-aligned rationale breakdowns.
+              Powered by Gemini 3.6 Flash. Ask complex clinical nursing questions, generate custom NCLEX study flashcards, request memory mnemonics, or review Saunders-aligned rationale breakdowns.
             </p>
           </div>
 

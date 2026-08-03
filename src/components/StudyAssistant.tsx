@@ -59,7 +59,7 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
         const ai = new GoogleGenAI({ apiKey: clientKey });
         const systemInstruction = `You are NursePrep AI, an expert NCLEX-RN study tutor and clinical judgment mentor. Provide concise, highly structured Saunders-standard NCLEX nursing guidance. Domain focus: ${unit}. Mode: ${mode}.`;
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.6-flash',
           contents: prompt,
           config: { systemInstruction, temperature: 0.7 }
         });

@@ -6,7 +6,7 @@ export interface BadgeConfig {
   id: string;
   name: string;
   description: string;
-  conditionType: 'beginner' | 'streak' | 'questionsCount' | 'score';
+  conditionType: 'beginner' | 'streak' | 'questionsCount' | 'score' | 'mastery' | 'unitMastery';
   conditionValue: number;
   icon: string;
   color: string;
@@ -120,6 +120,28 @@ export const DEFAULT_BADGES: BadgeConfig[] = [
     icon: 'Medal',
     color: 'text-indigo-600',
     bg: 'bg-indigo-50 border-indigo-200',
+    enabled: true,
+  },
+  {
+    id: 'half_century_50',
+    name: 'Half Centurion',
+    description: 'Answered 50 total NCLEX practice questions',
+    conditionType: 'questionsCount',
+    conditionValue: 50,
+    icon: 'CheckCircle',
+    color: 'text-teal-600',
+    bg: 'bg-teal-50 border-teal-200',
+    enabled: true,
+  },
+  {
+    id: 'mastery_80',
+    name: 'NCLEX Master Scholar',
+    description: 'Achieved 80% or higher overall NCLEX domain mastery',
+    conditionType: 'mastery',
+    conditionValue: 80,
+    icon: 'Star',
+    color: 'text-amber-600',
+    bg: 'bg-amber-50 border-amber-200',
     enabled: true,
   },
 ];
@@ -292,11 +314,12 @@ export function calculateUserStreak(history: any[]): { streak: number; totalQues
  */
 export function evaluateUserBadges(
   badgeConfigs: BadgeConfig[],
-  stats: { questionsAnswered: number; averageScore: number; streak: number; xp: number },
+  stats: { questionsAnswered: number; averageScore: number; streak: number; xp: number; overallMastery?: number },
   history: any[]
 ): UserBadgeState[] {
   const maxScore = history.reduce((max, item) => Math.max(max, item.score || 0), stats.averageScore || 0);
   const hasHistory = history.length > 0 || stats.questionsAnswered > 0;
+  const currentMastery = stats.overallMastery ?? stats.averageScore ?? 0;
 
   return badgeConfigs
     .filter(b => b.enabled)
@@ -324,6 +347,16 @@ export function evaluateUserBadges(
         case 'score':
           progress = Math.min(maxScore, progressMax);
           unlocked = maxScore >= progressMax;
+          break;
+
+        case 'mastery':
+          progress = Math.min(currentMastery, progressMax);
+          unlocked = currentMastery >= progressMax;
+          break;
+
+        case 'unitMastery':
+          progress = Math.min(currentMastery, progressMax);
+          unlocked = currentMastery >= progressMax;
           break;
       }
 

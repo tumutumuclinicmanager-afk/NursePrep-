@@ -176,6 +176,20 @@ export default function QuizGeneratorPage({
     if (auth.currentUser?.email) {
       try {
         setIsSavingScore(true);
+
+        // Build per-unit performance breakdown
+        const unitBreakdown: Record<string, { correct: number; total: number }> = {};
+        activeQuestions.forEach((q, idx) => {
+          const u = q.unitDomain || selectedUnit || 'General Nursing';
+          if (!unitBreakdown[u]) {
+            unitBreakdown[u] = { correct: 0, total: 0 };
+          }
+          unitBreakdown[u].total += 1;
+          if (isQuestionCorrect(q, idx)) {
+            unitBreakdown[u].correct += 1;
+          }
+        });
+
         await addDoc(collection(db, 'examHistory'), {
           user: auth.currentUser.email,
           title: `Quick Quiz: ${selectedUnit === 'All' ? 'All Units' : selectedUnit}`,
@@ -183,6 +197,7 @@ export default function QuizGeneratorPage({
           score: scoreData.percentage,
           correctQuestions: scoreData.correct,
           totalQuestions: scoreData.total,
+          unitBreakdown,
           timestamp: new Date().toISOString()
         });
       } catch (err) {
