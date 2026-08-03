@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { PublicLayout } from './layouts/PublicLayout';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import Home from './pages/Home';
@@ -88,6 +89,7 @@ function PublicOrDashboardExams() {
 export default function App() {
   return (
     <BrowserRouter>
+      <SpeedInsights />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
