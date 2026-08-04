@@ -98,10 +98,13 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
 
       // 1. Fetch Exams
       const examsSnap = await getDocs(query(collection(db, 'exams')));
-      const examList: ExamDoc[] = examsSnap.docs.map(docSnap => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<ExamDoc, 'id'>)
-      }));
+      const deletedExams = JSON.parse(localStorage.getItem('nurseprep_deleted_exams') || '[]');
+      const examList: ExamDoc[] = examsSnap.docs
+        .filter(docSnap => !deletedExams.includes(docSnap.id))
+        .map(docSnap => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<ExamDoc, 'id'>)
+        }));
       setExams(examList);
 
       // 2. Fetch Questions
@@ -115,7 +118,10 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
       // 3. Fetch Exam Modes
       try {
         const modesSnap = await getDocs(query(collection(db, 'exam_modes')));
-        const modesList = modesSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        const deletedModes = JSON.parse(localStorage.getItem('nurseprep_deleted_modes') || '[]');
+        const modesList = modesSnap.docs
+          .filter(docSnap => !deletedModes.includes(docSnap.id))
+          .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
         setCustomExamModes(modesList);
       } catch (e) {
         console.warn("Error fetching exam modes:", e);
@@ -151,12 +157,18 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
 
   const handleDeleteExamMode = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this custom exam mode?")) return;
+    
+    // Optimistic UI removal
+    setCustomExamModes(prev => prev.filter(m => m.id !== id));
     try {
       await deleteDoc(doc(db, 'exam_modes', id));
-      fetchExamsAndQuestions();
+      const deletedModes = JSON.parse(localStorage.getItem('nurseprep_deleted_modes') || '[]');
+      if (!deletedModes.includes(id)) {
+        deletedModes.push(id);
+        localStorage.setItem('nurseprep_deleted_modes', JSON.stringify(deletedModes));
+      }
     } catch (err) {
-      console.error('Error deleting exam mode:', err);
-      alert('Failed to delete exam mode.');
+      console.warn('Error deleting exam mode from Firestore:', err);
     }
   };
 
@@ -303,13 +315,20 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
   const handleDeleteExam = async (id?: string) => {
     if (!id) return;
     if (!window.confirm("Are you sure you want to delete this exam document?")) return;
+    
+    // Optimistic UI removal
+    setExams(prev => prev.filter(e => e.id !== id));
+    if (onExamUpdated) onExamUpdated();
+
     try {
       await deleteDoc(doc(db, 'exams', id));
-      setExams(prev => prev.filter(e => e.id !== id));
-      if (onExamUpdated) onExamUpdated();
+      const deletedExams = JSON.parse(localStorage.getItem('nurseprep_deleted_exams') || '[]');
+      if (!deletedExams.includes(id)) {
+        deletedExams.push(id);
+        localStorage.setItem('nurseprep_deleted_exams', JSON.stringify(deletedExams));
+      }
     } catch (err) {
-      console.error("Failed to delete exam:", err);
-      alert("Failed to delete exam from Firestore.");
+      console.warn("Firestore delete exam failed, removed locally:", err);
     }
   };
 
