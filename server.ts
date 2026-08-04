@@ -89,7 +89,7 @@ async function startServer() {
       Do not include markdown blocks like \`\`\`json. Just the array.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json"
@@ -180,7 +180,7 @@ Key guidelines:
       });
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: formattedContents,
         config: {
           systemInstruction,
@@ -197,7 +197,15 @@ Key guidelines:
   });
 
   // PDF Import / Quiz Mixing
-  app.post("/api/upload-exam", aiLimiter, upload.single("pdf"), async (req, res) => {
+  app.post("/api/upload-exam", aiLimiter, (req, res, next) => {
+    upload.single("pdf")(req, res, (err: any) => {
+      if (err) {
+        console.error("Multer upload error:", err);
+        return res.status(400).json({ error: err.message || "File upload error (Max 10MB)" });
+      }
+      next();
+    });
+  }, async (req, res) => {
     try {
       if (!req.file) {
         res.status(400).json({ error: "No file uploaded" });
@@ -293,7 +301,7 @@ Key guidelines:
           let response;
           try {
             response = await ai.models.generateContent({
-              model: "gemini-3.6-flash",
+              model: "gemini-2.5-flash",
               contents: prompt,
               config: {
                   responseMimeType: "application/json"
