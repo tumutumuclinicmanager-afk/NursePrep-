@@ -27,6 +27,18 @@ const DEFAULT_EXAM_TYPES = [
   'Examplify Exit Exam'
 ];
 
+const QUESTION_TYPES = [
+  { id: 'single_choice', label: 'Single Choice' },
+  { id: 'multiple_select', label: 'Multiple Select (SATA)' },
+  { id: 'true_false', label: 'True / False' },
+  { id: 'numeric', label: 'Numeric Calculation' },
+  { id: 'matching', label: 'Matching Pair' },
+  { id: 'fill_blank', label: 'Fill-in-the-Blank' },
+  { id: 'order_numbers', label: 'Ordered Sequence' },
+  { id: 'sieve_bowtie', label: 'Bowtie Question' },
+  { id: 'matrix_grid', label: 'Matrix / Grid' },
+];
+
 export default function UploadExams() {
   const [activeTab, setActiveTab] = useState<'builder' | 'pdf' | 'repository' | 'publisher'>('publisher');
   const [refreshRepoTrigger, setRefreshRepoTrigger] = useState(0);
@@ -123,18 +135,22 @@ export default function UploadExams() {
 
       // Also save individual questions to questions bank
       for (const q of extractedQuestions) {
+        const qTypeId = q.questionTypeId || 'single_choice';
+        const qTypeLabel = q.questionTypeLabel || 'Single Choice';
         const questionDoc = JSON.parse(JSON.stringify({
           examMode: selectedExamMode,
           unitDomain: 'General Nursing',
-          questionTypeId: 'single_choice',
-          questionTypeLabel: 'Single Choice',
+          questionTypeId: qTypeId,
+          questionTypeLabel: qTypeLabel,
           questionStem: q.question,
           options: q.options?.map((opt: string) => ({
             id: Math.random().toString(),
             text: opt,
-            isCorrect: opt === q.correctAnswer
+            isCorrect: Array.isArray(q.correctAnswer)
+              ? q.correctAnswer.includes(opt)
+              : opt === q.correctAnswer
           })),
-          difficulty: 'Medium',
+          difficulty: q.difficulty || 'Medium',
           rationale: q.explanation || '',
           createdAt: new Date().toISOString(),
           createdBy: 'PDF Extractor'
@@ -332,12 +348,32 @@ export default function UploadExams() {
                         {index + 1}
                       </span>
                       <div className="space-y-4 w-full">
-                        <p className="font-bold text-slate-800">{q.question}</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <p className="font-bold text-slate-800">{q.question}</p>
+                          <select
+                            value={q.questionTypeId || 'single_choice'}
+                            onChange={(e) => {
+                              const selectedType = QUESTION_TYPES.find(t => t.id === e.target.value);
+                              const updated = [...extractedQuestions];
+                              updated[index] = {
+                                ...updated[index],
+                                questionTypeId: e.target.value,
+                                questionTypeLabel: selectedType ? selectedType.label : 'Single Choice'
+                              };
+                              setExtractedQuestions(updated);
+                            }}
+                            className="px-2.5 py-1 border border-slate-200 rounded text-xs font-semibold bg-blue-50 text-blue-800 outline-none focus:border-blue-500 self-start sm:self-auto"
+                          >
+                            {QUESTION_TYPES.map(t => (
+                              <option key={t.id} value={t.id}>{t.label}</option>
+                            ))}
+                          </select>
+                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {q.options?.map((opt: string, i: number) => (
                             <div 
                               key={i} 
-                              className={`p-3 rounded-lg text-sm border ${opt === q.correctAnswer ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
+                              className={`p-3 rounded-lg text-sm border ${Array.isArray(q.correctAnswer) ? q.correctAnswer.includes(opt) : opt === q.correctAnswer ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
                             >
                               {opt}
                             </div>

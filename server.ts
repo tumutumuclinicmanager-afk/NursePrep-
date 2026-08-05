@@ -265,8 +265,24 @@ Key guidelines:
             }
           }
 
+          const lowerStem = questionStem.toLowerCase();
+          let qTypeId = "single_choice";
+          let qTypeLabel = "Single Choice";
+          if (lowerStem.includes("select all that apply") || lowerStem.includes("sata")) {
+            qTypeId = "multiple_select";
+            qTypeLabel = "Multiple Select (SATA)";
+          } else if (options.length === 2 && (options.some(o => o.toLowerCase() === 'true') || options.some(o => o.toLowerCase() === 'false'))) {
+            qTypeId = "true_false";
+            qTypeLabel = "True / False";
+          } else if (lowerStem.includes("calculate") || lowerStem.includes("ml/hr") || lowerStem.includes("mg")) {
+            qTypeId = "numeric";
+            qTypeLabel = "Numeric Calculation";
+          }
+
           extracted.push({
             question: questionStem.replace(/^[\d\.\)]+\s*/, '').trim() || `Question ${qNum || extracted.length + 1}`,
+            questionTypeId: qTypeId,
+            questionTypeLabel: qTypeLabel,
             options: options.length >= 4 ? options.slice(0, 4) : [...options, "Option C", "Option D"].slice(0, 4),
             correctAnswer: options[0] || "Option A",
             explanation: "Extracted from uploaded PDF document.",
@@ -288,10 +304,23 @@ Key guidelines:
             }
           });
           const prompt = `Extract ALL nursing exam questions present in the following text (e.g. Saunders NCLEX Q&A style). Do not truncate, omit, or summarize. Extract every single question from start to finish.
+          For each question, classify it into its valid question type:
+          - "single_choice" (Single Choice - 1 correct option)
+          - "multiple_select" (Multiple Select / Select All That Apply - SATA, multiple correct options)
+          - "true_false" (True / False)
+          - "numeric" (Numeric Calculation)
+          - "matching" (Matching pairs)
+          - "fill_blank" (Fill in the blank)
+          - "order_numbers" (Ordered sequence / prioritization steps)
+          - "sieve_bowtie" (Bowtie clinical judgment question)
+          - "matrix_grid" (Matrix / grid question)
+
           Return ONLY a JSON array of objects, where each object has:
           "question" (string), 
-          "options" (array of 4 strings), 
-          "correctAnswer" (string, one of the options), 
+          "questionTypeId" (string: e.g. "single_choice", "multiple_select", "true_false", "numeric", "matching", "fill_blank", "order_numbers", "sieve_bowtie", "matrix_grid"),
+          "questionTypeLabel" (string: e.g. "Single Choice", "Multiple Select (SATA)", "True / False", "Numeric Calculation", "Matching Pair", "Fill-in-the-Blank", "Ordered Sequence", "Bowtie Question", "Matrix / Grid"),
+          "options" (array of strings, e.g. options/choices), 
+          "correctAnswer" (string or array of strings, one or more correct options), 
           "explanation" (string), 
           "category" (string),
           "difficulty" (string).
