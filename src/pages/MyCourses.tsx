@@ -204,6 +204,209 @@ export default function MyCourses() {
     return { correct, total, percentage: total > 0 ? Math.round((correct / total) * 100) : 0 };
   };
 
+  if (practiceCourse) {
+    return (
+      <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6 animate-in fade-in">
+        <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-lg flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">
+              {practiceCourse.category} • {practiceCourse.domain}
+            </span>
+            <h3 className="text-xl font-extrabold text-white mt-1">
+              {practiceCourse.title}
+            </h3>
+          </div>
+          <Button 
+            variant="outline"
+            onClick={() => setPracticeCourse(null)}
+            className="text-white border-slate-700 hover:bg-slate-800 gap-2"
+          >
+            <ChevronLeft className="w-4 h-4" /> Back to Courses
+          </Button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
+          {!examCompleted ? (
+            practiceCourse.questions && practiceCourse.questions.length > 0 ? (() => {
+              const currentQ = normalizeQuestion(practiceCourse.questions[currentQuestionIndex]);
+              return (
+                <div className="space-y-6 pb-12">
+                  <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-slate-500 font-semibold">
+                      <span className="font-semibold text-slate-700">
+                        Question {currentQuestionIndex + 1} of {practiceCourse.questions.length} ({Math.round(((currentQuestionIndex + 1) / practiceCourse.questions.length) * 100)}%)
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={currentQuestionIndex === 0}
+                          onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                          className="h-8 text-xs px-3 gap-1 bg-white"
+                        >
+                          <ChevronLeft className="w-4 h-4" /> Previous
+                        </Button>
+
+                        {currentQuestionIndex < practiceCourse.questions.length - 1 ? (
+                          <Button
+                            size="sm"
+                            onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
+                            className="h-8 text-xs px-3 bg-blue-600 hover:bg-blue-700 text-white gap-1"
+                          >
+                            Next <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() => setExamCompleted(true)}
+                            className="h-8 text-xs px-3 bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-bold"
+                          >
+                            Submit <Award className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-blue-600 h-full transition-all duration-300"
+                        style={{ width: `${((currentQuestionIndex + 1) / practiceCourse.questions.length) * 100}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 overflow-x-auto pt-1 pb-0.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                        Jump:
+                      </span>
+                      {practiceCourse.questions.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setCurrentQuestionIndex(idx)}
+                          className={`w-7 h-7 text-xs font-bold rounded-lg shrink-0 transition-all ${
+                            currentQuestionIndex === idx
+                              ? 'bg-blue-600 text-white shadow-xs scale-105'
+                              : selectedAnswers[idx] !== undefined
+                              ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          {idx + 1}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-2">
+                    <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                      {currentQ.questionTypeLabel || 'Single Choice'}
+                    </span>
+                    <p className="font-bold text-slate-900 text-base leading-relaxed">
+                      {currentQ.question}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                      Select the correct answer:
+                    </label>
+                    {currentQ.options.map((opt: string, i: number) => {
+                      const isSelected = selectedAnswers[currentQuestionIndex] === opt;
+                      const isCorrect = opt === currentQ.correctAnswer;
+                      const isRevealed = showRationale[currentQuestionIndex];
+
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: opt }));
+                            setShowRationale(prev => ({ ...prev, [currentQuestionIndex]: true }));
+                          }}
+                          className={`w-full p-4 rounded-xl border text-left font-medium text-sm transition-all flex items-start gap-3 ${
+                            isRevealed && isCorrect
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold ring-1 ring-emerald-400'
+                              : isRevealed && isSelected && !isCorrect
+                              ? 'bg-rose-50 border-rose-300 text-rose-950 font-bold'
+                              : isSelected
+                              ? 'bg-blue-50 border-blue-300 text-blue-900 font-bold'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                            {String.fromCharCode(65 + i)}
+                          </span>
+                          <span className="flex-grow">{opt}</span>
+                          {isRevealed && isCorrect && <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {showRationale[currentQuestionIndex] && (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
+                      <span className="text-xs font-extrabold text-blue-900 uppercase tracking-wider block">
+                        Clinical Rationale & Explanation
+                      </span>
+                      <p className="text-xs text-blue-950 leading-relaxed">
+                        {currentQ.explanation || 'Rationales provide clinical reasoning behind the correct therapeutic action.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })() : (
+              <p className="text-slate-500 text-sm text-center py-8">No questions found for this course exam.</p>
+            )
+          ) : (
+            <div className="p-12 text-center space-y-6">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+                <Award className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-extrabold text-slate-900">Exam Session Completed!</h3>
+                <p className="text-sm text-slate-500">Here is your performance summary on {practiceCourse.title}</p>
+              </div>
+
+              {(() => {
+                const score = calculateScore();
+                return (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 max-w-sm mx-auto space-y-3">
+                    <div className="text-4xl font-extrabold text-slate-900">
+                      {score.percentage}%
+                    </div>
+                    <p className="text-xs font-semibold text-slate-600">
+                      You scored <strong className="text-emerald-600">{score.correct}</strong> out of <strong>{score.total}</strong> questions correctly.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              <div className="flex justify-center gap-3 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setCurrentQuestionIndex(0);
+                    setSelectedAnswers({});
+                    setShowRationale({});
+                    setExamCompleted(false);
+                  }}
+                >
+                  Retake Course Exam
+                </Button>
+                <Button 
+                  onClick={() => setPracticeCourse(null)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Return to My Courses
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6">
       {/* Header Banner */}
@@ -484,250 +687,6 @@ export default function MyCourses() {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* Interactive Practice Exam Modal */}
-      {practiceCourse && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 space-y-6 shadow-2xl border border-slate-200 my-8">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-              <div>
-                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
-                  {practiceCourse.category} • {practiceCourse.domain}
-                </span>
-                <h3 className="text-xl font-bold text-slate-900">
-                  {practiceCourse.title}
-                </h3>
-              </div>
-              <button 
-                onClick={() => setPracticeCourse(null)} 
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-2 hover:bg-slate-100 rounded-lg"
-              >
-                ✕ Close
-              </button>
-            </div>
-
-            {/* Questions Player */}
-            {!examCompleted ? (
-              practiceCourse.questions && practiceCourse.questions.length > 0 ? (() => {
-                const currentQ = normalizeQuestion(practiceCourse.questions[currentQuestionIndex]);
-                return (
-                  <div className="space-y-6 pb-20">
-                    {/* Progress Indicator & Top Quick Nav Header */}
-                    <div className="space-y-3 bg-slate-50/80 p-4 rounded-xl border border-slate-200/80">
-                      <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-slate-500 font-semibold">
-                        <span className="font-semibold text-slate-700">
-                          Question {currentQuestionIndex + 1} of {practiceCourse.questions.length} ({Math.round(((currentQuestionIndex + 1) / practiceCourse.questions.length) * 100)}%)
-                        </span>
-
-                        {/* Top Header Quick Nav Buttons */}
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={currentQuestionIndex === 0}
-                            onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-                            className="h-8 text-xs px-3 gap-1 shadow-2xs bg-white"
-                            title="Previous Question (Left Arrow)"
-                          >
-                            <ChevronLeft className="w-4 h-4" /> Previous
-                          </Button>
-
-                          {currentQuestionIndex < practiceCourse.questions.length - 1 ? (
-                            <Button
-                              size="sm"
-                              onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                              className="h-8 text-xs px-3 bg-blue-600 hover:bg-blue-700 text-white gap-1 shadow-xs font-bold"
-                              title="Next Question (Right Arrow)"
-                            >
-                              Next <ChevronRight className="w-4 h-4" />
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => setExamCompleted(true)}
-                              className="h-8 text-xs px-3 bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-extrabold shadow-xs"
-                            >
-                              Submit <Award className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div 
-                          className="bg-blue-600 h-full transition-all duration-300" 
-                          style={{ width: `${((currentQuestionIndex + 1) / practiceCourse.questions.length) * 100}%` }}
-                        />
-                      </div>
-
-                      {/* Question Jump Pills */}
-                      <div className="flex items-center gap-1.5 overflow-x-auto pt-1 pb-0.5 no-scrollbar">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-                          Jump:
-                        </span>
-                        {practiceCourse.questions.map((_, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => setCurrentQuestionIndex(idx)}
-                            className={`w-7 h-7 text-xs font-bold rounded-lg shrink-0 transition-all ${
-                              currentQuestionIndex === idx
-                                ? 'bg-blue-600 text-white shadow-xs scale-105'
-                                : selectedAnswers[idx] !== undefined
-                                ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                            }`}
-                          >
-                            {idx + 1}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Question Stem */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                      <h4 className="font-bold text-slate-900 text-sm md:text-base leading-relaxed">
-                        {currentQ.question}
-                      </h4>
-                    </div>
-
-                    {/* Options List */}
-                    <div className="space-y-2">
-                      {currentQ.options.map((opt: string, oIdx: number) => {
-                        const isSelected = selectedAnswers[currentQuestionIndex] === opt;
-                        const isCorrect = opt === currentQ.correctAnswer;
-                        const revealed = showRationale[currentQuestionIndex];
-
-                        let btnStyle = "bg-white border-slate-200 text-slate-800 hover:border-blue-400 hover:bg-blue-50/50";
-                        if (isSelected) {
-                          btnStyle = "bg-blue-50 border-blue-600 text-blue-900 font-semibold";
-                        }
-                        if (revealed) {
-                          if (isCorrect) {
-                            btnStyle = "bg-emerald-50 border-emerald-600 text-emerald-900 font-bold";
-                          } else if (isSelected && !isCorrect) {
-                            btnStyle = "bg-rose-50 border-rose-500 text-rose-900";
-                          }
-                        }
-
-                        return (
-                          <button
-                            key={oIdx}
-                            onClick={() => {
-                              setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: opt }));
-                            }}
-                            className={`w-full text-left p-3.5 rounded-xl border text-xs md:text-sm transition-all flex items-center justify-between gap-3 ${btnStyle}`}
-                          >
-                            <span>{opt}</span>
-                            {revealed && isCorrect && <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Rationale Drawer */}
-                    {showRationale[currentQuestionIndex] && (
-                      <div className="bg-emerald-50/80 border border-emerald-200 p-4 rounded-xl space-y-1 text-xs text-emerald-950">
-                        <p className="font-bold text-emerald-800 flex items-center gap-1.5">
-                          <HelpCircle className="w-4 h-4 text-emerald-600" />
-                          Saunders Clinical Rationale:
-                        </p>
-                        <p className="leading-relaxed text-slate-700">
-                          {currentQ.explanation}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Sticky Bottom Question Action Bar - Always visible */}
-                    <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md pt-3 pb-3 px-4 sm:px-6 border-t border-slate-200/90 shadow-lg z-30 rounded-b-2xl flex items-center justify-between gap-2 -mx-6 -mb-6">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowRationale(prev => ({ ...prev, [currentQuestionIndex]: !prev[currentQuestionIndex] }))}
-                        className="text-xs text-purple-700 border-purple-200 hover:bg-purple-50 shrink-0"
-                      >
-                        {showRationale[currentQuestionIndex] ? 'Hide Rationale' : 'Check Rationale'}
-                      </Button>
-
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          disabled={currentQuestionIndex === 0}
-                          onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-                          className="text-xs font-semibold gap-1"
-                        >
-                          <ChevronLeft className="w-4 h-4" /> Prev
-                        </Button>
-
-                        {currentQuestionIndex < practiceCourse.questions.length - 1 ? (
-                          <Button 
-                            onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold gap-1 shadow-sm"
-                          >
-                            Next <ChevronRight className="w-4 h-4" />
-                          </Button>
-                        ) : (
-                          <Button 
-                            onClick={() => setExamCompleted(true)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-sm gap-1"
-                          >
-                            Submit <Award className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })() : (
-                <div className="text-center py-8">
-                  <p className="text-xs text-slate-500">No questions available in this bundle player.</p>
-                </div>
-              )
-            ) : (
-              /* Exam Completed Summary */
-              <div className="text-center space-y-6 py-6">
-                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                  <Award className="w-10 h-10" />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-2xl font-black text-slate-900">Exam Attempt Completed!</h4>
-                  <p className="text-xs text-slate-500">Here is your performance summary for {practiceCourse.title}</p>
-                </div>
-
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 inline-block max-w-sm w-full space-y-2">
-                  <p className="text-xs text-slate-500 uppercase font-semibold">Overall Score</p>
-                  <p className="text-4xl font-black text-emerald-600">
-                    {calculateScore().percentage}%
-                  </p>
-                  <p className="text-xs text-slate-600">
-                    Correct Answers: <strong>{calculateScore().correct}</strong> / {calculateScore().total}
-                  </p>
-                </div>
-
-                <div className="flex justify-center gap-3">
-                  <Button 
-                    variant="outline"
-                    onClick={() => {
-                      setCurrentQuestionIndex(0);
-                      setSelectedAnswers({});
-                      setShowRationale({});
-                      setExamCompleted(false);
-                    }}
-                    className="text-xs"
-                  >
-                    Retake Exam
-                  </Button>
-                  <Button 
-                    onClick={() => setPracticeCourse(null)}
-                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs"
-                  >
-                    Back to My Courses
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       )}
 
