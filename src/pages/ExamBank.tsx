@@ -888,18 +888,13 @@ export default function ExamBank() {
   }, {} as Record<string, ExamItem[]>);
 
   const handleAction = (exam: ExamItem) => {
-    // Check if user has purchased item explicitly
-    if (purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id)) {
-      navigate('/dashboard/courses');
-      return;
-    }
-
     const reqPlan = exam.requiredPlan || 'free';
     const reqLevel = PLAN_LEVELS[reqPlan] || 1;
     const userLevel = PLAN_LEVELS[userSubscriptionPlan] || 1;
+    const hasPurchased = purchasedTitles.has(exam.title) || purchasedTitles.has(exam.id);
 
-    // 1. Subscription Tier Gate Check
-    if (userLevel < reqLevel) {
+    // 1. Subscription Tier Gate Check (bypass if purchased)
+    if (userLevel < reqLevel && !hasPurchased) {
       setRequiredPlanModalExam(exam);
       return;
     }
@@ -915,7 +910,10 @@ export default function ExamBank() {
     const maxAllowed = limits[userSubscriptionPlan] ?? 0;
 
     let displayQuestions = [...qList];
-    if (maxAllowed > 0 && maxAllowed < qList.length) {
+    if (hasPurchased || userLevel >= reqLevel) {
+      displayQuestions = [...qList];
+      setPracticeLimitInfo(null);
+    } else if (maxAllowed > 0 && maxAllowed < qList.length) {
       displayQuestions = qList.slice(0, maxAllowed);
       setPracticeLimitInfo({ limit: maxAllowed, total: qList.length });
     } else {
@@ -929,6 +927,7 @@ export default function ExamBank() {
     };
 
     setPracticeExam(launchExam);
+    setSelectedExamTypePage(null);
     setCurrentQuestionIndex(0);
     setSelectedAnswers({});
     setShowRationale({});
