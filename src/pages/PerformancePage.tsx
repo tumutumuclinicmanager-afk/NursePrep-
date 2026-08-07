@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/Button';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { NURSING_UNITS } from '@/data/quizQuestions';
-import QuizGeneratorPage from './QuizGeneratorPage';
 import { 
   fetchBadgeConfigs, 
   calculateUserStreak, 
@@ -39,10 +38,7 @@ export default function PerformancePage() {
   const [evaluatedBadges, setEvaluatedBadges] = useState<UserBadgeState[]>([]);
   const [badgeFilter, setBadgeFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
 
-  // Quick Quiz Generator Widget State
-  const [selectedUnit, setSelectedUnit] = useState<string>('All');
-  const [questionCount, setQuestionCount] = useState<number>(5);
-  const [showQuizModal, setShowQuizModal] = useState<boolean>(false);
+
 
   const fetchUserData = async () => {
     try {
@@ -176,8 +172,7 @@ export default function PerformancePage() {
   });
 
   const handleLaunchUnitQuiz = (unitName: string) => {
-    setSelectedUnit(unitName);
-    setShowQuizModal(true);
+    navigate(`/dashboard/generator?unit=${encodeURIComponent(unitName)}`);
   };
 
   return (
@@ -194,7 +189,7 @@ export default function PerformancePage() {
         </div>
         <div className="flex items-center gap-3">
           <Button 
-            onClick={() => { setSelectedUnit('All'); setShowQuizModal(true); }}
+            onClick={() => navigate('/dashboard/generator')}
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 shadow-sm rounded-xl"
           >
             Generate Practice Test
@@ -480,31 +475,6 @@ export default function PerformancePage() {
           </div>
         )}
       </div>
-
-      {/* Quiz Modal */}
-      {showQuizModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative border border-slate-200">
-            <button
-              onClick={() => setShowQuizModal(false)}
-              className="absolute top-4 right-4 text-xs font-bold text-slate-500 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-slate-100"
-            >
-              Close ✕
-            </button>
-
-            <div className="mb-4">
-              <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full uppercase">
-                Practice Unit Test
-              </span>
-              <h2 className="text-xl font-extrabold text-slate-900 mt-1">
-                NCLEX Practice Session: {selectedUnit}
-              </h2>
-            </div>
-
-            <QuizGeneratorPage initialUnit={selectedUnit} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

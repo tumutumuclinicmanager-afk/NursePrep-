@@ -4,13 +4,13 @@ import { Button } from '@/components/ui/Button';
 import { 
   BrainCircuit, Play, Clock, CheckCircle, HelpCircle, 
   Award, ArrowRight, RotateCcw, Filter, ChevronUp, 
-  ChevronDown, ChevronLeft, ChevronRight, Layers, AlertCircle, Check, X, BookOpen, GripVertical
+  ChevronDown, ChevronLeft, ChevronRight, Layers, AlertCircle, Check, X, BookOpen, GripVertical, Calculator
 } from 'lucide-react';
 import { QuestionData } from '@/types';
 import { ALL_QUIZ_QUESTIONS, NURSING_UNITS, NursingUnit, ALL_EXAM_TYPES, normalizeExamCategory } from '@/data/quizQuestions';
 import { collection, addDoc, getDocs, query } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 interface QuizGeneratorProps {
   embeddedModal?: boolean;
@@ -26,10 +26,12 @@ export default function QuizGeneratorPage({
   initialQuestionCount
 }: QuizGeneratorProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlUnit = searchParams.get('unit');
 
   // Configuration State
   const [selectedExamMode, setSelectedExamMode] = useState<string>('All');
-  const [selectedUnit, setSelectedUnit] = useState<string>(initialUnit || 'All');
+  const [selectedUnit, setSelectedUnit] = useState<string>(urlUnit || initialUnit || 'All');
   const [questionCount, setQuestionCount] = useState<number>(initialQuestionCount || 5);
   const [selectedType, setSelectedType] = useState<string>('All');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('All');
@@ -50,6 +52,70 @@ export default function QuizGeneratorPage({
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [isSavingScore, setIsSavingScore] = useState<boolean>(false);
   const [dbQuestions, setDbQuestions] = useState<QuestionData[]>([]);
+
+  // Calculator state
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [calcInput, setCalcInput] = useState('0');
+  const [calcPrevInput, setCalcPrevInput] = useState<string | null>(null);
+  const [calcOperation, setCalcOperation] = useState<string | null>(null);
+
+  const handleCalcNum = (num: string) => {
+    if (calcInput === '0' || calcInput.startsWith('Drip:') || calcInput.startsWith('BMI:')) {
+      setCalcInput(num);
+    } else {
+      setCalcInput(prev => prev + num);
+    }
+  };
+
+  const handleCalcClear = () => {
+    setCalcInput('0');
+    setCalcPrevInput(null);
+    setCalcOperation(null);
+  };
+
+  const handleCalcDel = () => {
+    if (calcInput.length <= 1 || calcInput.startsWith('Drip:') || calcInput.startsWith('BMI:')) {
+      setCalcInput('0');
+    } else {
+      setCalcInput(prev => prev.slice(0, -1));
+    }
+  };
+
+  const handleCalcPercent = () => {
+    try {
+      const val = parseFloat(calcInput);
+      setCalcInput((val / 100).toString());
+    } catch {
+      setCalcInput('Error');
+    }
+  };
+
+  const handleCalcOp = (op: string) => {
+    setCalcPrevInput(calcInput);
+    setCalcOperation(op);
+    setCalcInput('0');
+  };
+
+  const handleCalcEquals = () => {
+    if (calcPrevInput === null || calcOperation === null) return;
+    try {
+      const prev = parseFloat(calcPrevInput);
+      const current = parseFloat(calcInput);
+      let res = 0;
+      switch (calcOperation) {
+        case '+': res = prev + current; break;
+        case '-': res = prev - current; break;
+        case '*': res = prev * current; break;
+        case '/': res = current !== 0 ? prev / current : 0; break;
+        default: return;
+      }
+      setCalcInput(res.toString());
+      setCalcPrevInput(null);
+      setCalcOperation(null);
+    } catch {
+      setCalcInput('Error');
+    }
+  };
 
   React.useEffect(() => {
     const fetchDbQuestions = async () => {
@@ -748,13 +814,72 @@ export default function QuizGeneratorPage({
               </div>
             </div>
 
-            <button
-              onClick={() => setIsQuizActive(false)}
-              className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
-            >
-              Exit Quiz
-            </button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCalculator(prev => !prev)}
+                className="gap-1.5 bg-slate-800 text-blue-400 border-slate-700 hover:bg-slate-700 hover:text-white font-extrabold text-xs shadow-xs"
+              >
+                <Calculator className="w-4 h-4 text-blue-400" />
+                {showCalculator ? 'Close Calc' : 'Calculator'}
+              </Button>
+              <button
+                onClick={() => setIsQuizActive(false)}
+                className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors font-bold"
+              >
+                Exit Quiz
+              </button>
+            </div>
           </div>
+
+          {showCalculator && (
+            <div className="px-6 pt-4 pb-2 bg-slate-900 border-b border-slate-800 flex justify-end">
+              <div className="bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 p-4 w-72 space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-blue-400">
+                    <Calculator className="w-3.5 h-3.5" /> Medical & Board Calculator
+                  </div>
+                  <button 
+                    onClick={() => setShowCalculator(false)}
+                    className="text-slate-400 hover:text-white p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-right font-mono text-xl tracking-wider text-emerald-400 overflow-x-auto">
+                  {calcInput}
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5 text-xs font-bold">
+                  <button onClick={() => handleCalcClear()} className="p-2 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg">C</button>
+                  <button onClick={() => handleCalcDel()} className="p-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg">⌫</button>
+                  <button onClick={() => handleCalcPercent()} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg">%</button>
+                  <button onClick={() => handleCalcOp('/')} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg">÷</button>
+
+                  <button onClick={() => handleCalcNum('7')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">7</button>
+                  <button onClick={() => handleCalcNum('8')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">8</button>
+                  <button onClick={() => handleCalcNum('9')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">9</button>
+                  <button onClick={() => handleCalcOp('*')} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg">×</button>
+
+                  <button onClick={() => handleCalcNum('4')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">4</button>
+                  <button onClick={() => handleCalcNum('5')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">5</button>
+                  <button onClick={() => handleCalcNum('6')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">6</button>
+                  <button onClick={() => handleCalcOp('-')} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg">-</button>
+
+                  <button onClick={() => handleCalcNum('1')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">1</button>
+                  <button onClick={() => handleCalcNum('2')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">2</button>
+                  <button onClick={() => handleCalcNum('3')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">3</button>
+                  <button onClick={() => handleCalcOp('+')} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg">+</button>
+
+                  <button onClick={() => handleCalcNum('0')} className="col-span-2 p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">0</button>
+                  <button onClick={() => handleCalcNum('.')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">.</button>
+                  <button onClick={() => handleCalcEquals()} className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">=</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {!isCompleted ? (
             <div className="p-6 md:p-8 space-y-6 pb-24">

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { 
   Search, Filter, BookOpen, Activity, HeartPulse, Brain, Baby, 
   ArrowRight, DollarSign, ShoppingCart, Folder, FolderOpen, 
-  ChevronRight, ChevronDown, ChevronLeft, Clock, HelpCircle, CheckCircle, 
+  ChevronRight, ChevronDown, ChevronLeft, ChevronUp, Clock, HelpCircle, CheckCircle, 
   Award, Grid, List, Play, Tag, Layers, RefreshCw, X, AlertCircle, Database,
   Bookmark, BookmarkCheck, Trash2, Star, Lock, Crown, ShieldCheck, Calculator, GripVertical
 } from 'lucide-react';

@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { NURSING_UNITS } from '@/data/quizQuestions';
-import QuizGeneratorPage from './QuizGeneratorPage';
+
 import { StudyAssistant } from '@/components/StudyAssistant';
 import { 
   fetchBadgeConfigs, 
@@ -47,9 +47,7 @@ export default function StudentDashboard() {
   const [history, setHistory] = useState<any[]>([]);
   const [evaluatedBadges, setEvaluatedBadges] = useState<UserBadgeState[]>([]);
 
-  // Quick Quiz Generator Widget State
-  const [selectedUnit, setSelectedUnit] = useState<string>('All');
-  const [showQuizModal, setShowQuizModal] = useState<boolean>(false);
+
 
   const fetchUserData = async () => {
     try {
@@ -177,7 +175,7 @@ export default function StudentDashboard() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Button
-              onClick={() => { setSelectedUnit('All'); setShowQuizModal(true); }}
+              onClick={() => navigate('/dashboard/generator')}
               className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md flex items-center gap-2"
             >
               <Zap className="w-4 h-4 fill-white" />
@@ -310,7 +308,7 @@ export default function StudentDashboard() {
             <div className="py-8 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
               <p className="text-xs font-medium">No quiz attempts recorded yet.</p>
               <Button
-                onClick={() => { setSelectedUnit('All'); setShowQuizModal(true); }}
+                onClick={() => navigate('/dashboard/generator')}
                 className="mt-3 bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg"
               >
                 Start First Quiz
@@ -366,31 +364,6 @@ export default function StudentDashboard() {
           Launch Study Assistant
         </Button>
       </div>
-
-      {/* Quick Quiz Modal */}
-      {showQuizModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative border border-slate-200">
-            <button
-              onClick={() => setShowQuizModal(false)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="mb-4">
-              <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full uppercase">
-                Quick Quiz Launcher
-              </span>
-              <h2 className="text-xl font-extrabold text-slate-900 mt-1">
-                NCLEX Practice Session
-              </h2>
-            </div>
-
-            <QuizGeneratorPage initialUnit={selectedUnit} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
