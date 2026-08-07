@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { 
   BrainCircuit, Play, Clock, CheckCircle, HelpCircle, 
   Award, ArrowRight, RotateCcw, Filter, ChevronUp, 
-  ChevronDown, ChevronLeft, ChevronRight, Layers, AlertCircle, Check, X, BookOpen
+  ChevronDown, ChevronLeft, ChevronRight, Layers, AlertCircle, Check, X, BookOpen, GripVertical
 } from 'lucide-react';
 import { QuestionData } from '@/types';
 import { ALL_QUIZ_QUESTIONS, NURSING_UNITS, NursingUnit, ALL_EXAM_TYPES, normalizeExamCategory } from '@/data/quizQuestions';
@@ -132,7 +132,7 @@ export default function QuizGeneratorPage({
     // Initialize ordering questions steps
     const initialAnswers: Record<number, any> = {};
     finalQuestions.forEach((q, idx) => {
-      if (q.questionTypeId === 'order_drag' && q.orderedSteps) {
+      if ((q.questionTypeId === 'order_drag' || q.questionTypeId === 'order_numbers') && q.orderedSteps) {
         // Shuffle steps for ordering question initially
         initialAnswers[idx] = [...q.orderedSteps].sort(() => 0.5 - Math.random());
       }
@@ -174,7 +174,7 @@ export default function QuizGeneratorPage({
       return ans === q.trueFalseAnswer;
     }
 
-    if (q.questionTypeId === 'order_drag') {
+    if (q.questionTypeId === 'order_drag' || q.questionTypeId === 'order_numbers') {
       if (!Array.isArray(ans) || !q.orderedSteps) return false;
       return JSON.stringify(ans) === JSON.stringify(q.orderedSteps);
     }
@@ -182,7 +182,28 @@ export default function QuizGeneratorPage({
     return false;
   };
 
-  // Move ordering step up/down
+  // Drag and Drop state for ordering questions
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, stepIdx: number) => {
+    setDraggedIndex(stepIdx);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, questionIdx: number, targetIdx: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIdx) return;
+    const currentList: string[] = [...(userAnswers[questionIdx] || activeQuestions[questionIdx].orderedSteps || [])];
+    const [moved] = currentList.splice(draggedIndex, 1);
+    currentList.splice(targetIdx, 0, moved);
+    setUserAnswers(prev => ({ ...prev, [questionIdx]: currentList }));
+    setDraggedIndex(null);
+  };
   const moveStep = (questionIdx: number, stepIdx: number, direction: 'up' | 'down') => {
     const currentList: string[] = [...(userAnswers[questionIdx] || [])];
     const targetIdx = direction === 'up' ? stepIdx - 1 : stepIdx + 1;
@@ -424,22 +445,31 @@ export default function QuizGeneratorPage({
       );
     }
 
-    if (q.questionTypeId === 'order_drag') {
+    if (q.questionTypeId === 'order_drag' || q.questionTypeId === 'order_numbers') {
       const orderedList: string[] = userAnswers[index] || q.orderedSteps || [];
 
       return (
         <div className="space-y-3">
-          <div className="bg-blue-50 border border-blue-200 text-blue-900 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2">
+          <div className="bg-blue-50 border border-blue-200 text-blue-900 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
             <Layers className="w-4 h-4 text-blue-600 shrink-0" />
-            Arrange the actions in correct priority order using the Up / Down controls (1 = Highest Priority)
+            <span>Click and drag choices using the grip handle <GripVertical className="w-3.5 h-3.5 inline text-blue-600" /> or use the up/down controls to arrange them in correct priority order (1 = Highest Priority).</span>
           </div>
           <div className="space-y-2">
             {orderedList.map((stepText, i) => (
               <div
                 key={i}
-                className="p-3.5 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-3 shadow-2xs"
+                draggable={!isCompleted}
+                onDragStart={(e) => handleDragStart(e, i)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, index, i)}
+                className={`p-3.5 bg-white border rounded-xl flex items-center justify-between gap-3 shadow-2xs transition-all cursor-grab active:cursor-grabbing ${
+                  draggedIndex === i ? 'opacity-40 border-blue-400 border-dashed' : 'border-slate-200 hover:border-slate-300'
+                }`}
               >
                 <div className="flex items-center gap-3">
+                  <div className="text-slate-400 hover:text-slate-600 p-0.5">
+                    <GripVertical className="w-5 h-5" />
+                  </div>
                   <span className="w-7 h-7 rounded-lg bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center shrink-0">
                     #{i + 1}
                   </span>
@@ -448,16 +478,20 @@ export default function QuizGeneratorPage({
 
                 <div className="flex items-center gap-1 shrink-0">
                   <button
+                    type="button"
                     disabled={i === 0 || isCompleted}
                     onClick={() => moveStep(index, i, 'up')}
                     className="p-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 rounded-md text-slate-700"
+                    title="Move Up"
                   >
                     <ChevronUp className="w-4 h-4" />
                   </button>
                   <button
+                    type="button"
                     disabled={i === orderedList.length - 1 || isCompleted}
                     onClick={() => moveStep(index, i, 'down')}
                     className="p-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 rounded-md text-slate-700"
+                    title="Move Down"
                   >
                     <ChevronDown className="w-4 h-4" />
                   </button>

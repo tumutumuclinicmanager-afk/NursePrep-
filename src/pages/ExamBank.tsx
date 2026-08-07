@@ -6,7 +6,7 @@ import {
   ArrowRight, DollarSign, ShoppingCart, Folder, FolderOpen, 
   ChevronRight, ChevronDown, ChevronLeft, Clock, HelpCircle, CheckCircle, 
   Award, Grid, List, Play, Tag, Layers, RefreshCw, X, AlertCircle, Database,
-  Bookmark, BookmarkCheck, Trash2, Star, Lock, Crown, ShieldCheck
+  Bookmark, BookmarkCheck, Trash2, Star, Lock, Crown, ShieldCheck, Calculator, GripVertical
 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
@@ -457,6 +457,70 @@ export default function ExamBank() {
 
   // State for dynamic board categories
   const [dynamicBoardCategories, setDynamicBoardCategories] = useState<string[]>([...ALL_EXAM_TYPES]);
+
+  // Calculator state
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [calcInput, setCalcInput] = useState('0');
+  const [calcPrevInput, setCalcPrevInput] = useState<string | null>(null);
+  const [calcOperation, setCalcOperation] = useState<string | null>(null);
+
+  const handleCalcNum = (num: string) => {
+    if (calcInput === '0' || calcInput.startsWith('Drip:') || calcInput.startsWith('BMI:')) {
+      setCalcInput(num);
+    } else {
+      setCalcInput(prev => prev + num);
+    }
+  };
+
+  const handleCalcClear = () => {
+    setCalcInput('0');
+    setCalcPrevInput(null);
+    setCalcOperation(null);
+  };
+
+  const handleCalcDel = () => {
+    if (calcInput.length <= 1 || calcInput.startsWith('Drip:') || calcInput.startsWith('BMI:')) {
+      setCalcInput('0');
+    } else {
+      setCalcInput(prev => prev.slice(0, -1));
+    }
+  };
+
+  const handleCalcPercent = () => {
+    try {
+      const val = parseFloat(calcInput);
+      setCalcInput((val / 100).toString());
+    } catch {
+      setCalcInput('Error');
+    }
+  };
+
+  const handleCalcOp = (op: string) => {
+    setCalcPrevInput(calcInput);
+    setCalcOperation(op);
+    setCalcInput('0');
+  };
+
+  const handleCalcEquals = () => {
+    if (calcPrevInput === null || calcOperation === null) return;
+    try {
+      const prev = parseFloat(calcPrevInput);
+      const current = parseFloat(calcInput);
+      let res = 0;
+      switch (calcOperation) {
+        case '+': res = prev + current; break;
+        case '-': res = prev - current; break;
+        case '*': res = prev * current; break;
+        case '/': res = current !== 0 ? prev / current : 0; break;
+        default: return;
+      }
+      setCalcInput(res.toString());
+      setCalcPrevInput(null);
+      setCalcOperation(null);
+    } catch {
+      setCalcInput('Error');
+    }
+  };
 
   // State for Firestore loaded exams
   const [examsList, setExamsList] = useState<ExamItem[]>(defaultExamBundles);
@@ -920,6 +984,14 @@ export default function ExamBank() {
       setPracticeLimitInfo(null);
     }
 
+    const initialAnswers: Record<number, any> = {};
+    displayQuestions.forEach((q: any, idx: number) => {
+      const isOrdering = q.questionTypeId === 'order_drag' || q.questionTypeId === 'order_numbers' || q.orderedSteps;
+      if (isOrdering && q.orderedSteps) {
+        initialAnswers[idx] = [...q.orderedSteps].sort(() => 0.5 - Math.random());
+      }
+    });
+
     const launchExam: ExamItem = {
       ...exam,
       questions: displayQuestions,
@@ -929,9 +1001,44 @@ export default function ExamBank() {
     setPracticeExam(launchExam);
     setSelectedExamTypePage(null);
     setCurrentQuestionIndex(0);
-    setSelectedAnswers({});
+    setSelectedAnswers(initialAnswers);
     setShowRationale({});
     setExamCompleted(false);
+  };
+
+  // Drag and Drop state for ordering questions in ExamBank
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, stepIdx: number) => {
+    setDraggedIndex(stepIdx);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, questionIdx: number, targetIdx: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIdx) return;
+    const q = practiceExam?.questions[questionIdx];
+    const orderedList: string[] = [...(selectedAnswers[questionIdx] || q?.orderedSteps || [])];
+    const [moved] = orderedList.splice(draggedIndex, 1);
+    orderedList.splice(targetIdx, 0, moved);
+    setSelectedAnswers(prev => ({ ...prev, [questionIdx]: orderedList }));
+    setDraggedIndex(null);
+  };
+
+  const moveStep = (questionIdx: number, stepIdx: number, direction: 'up' | 'down') => {
+    const q = practiceExam?.questions[questionIdx];
+    const orderedList: string[] = [...(selectedAnswers[questionIdx] || q?.orderedSteps || [])];
+    const targetIdx = direction === 'up' ? stepIdx - 1 : stepIdx + 1;
+    if (targetIdx < 0 || targetIdx >= orderedList.length) return;
+    const temp = orderedList[stepIdx];
+    orderedList[stepIdx] = orderedList[targetIdx];
+    orderedList[targetIdx] = temp;
+    setSelectedAnswers(prev => ({ ...prev, [questionIdx]: orderedList }));
   };
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
@@ -977,10 +1084,18 @@ export default function ExamBank() {
   const calculateScore = () => {
     if (!practiceExam || !practiceExam.questions) return { correct: 0, total: 0, percentage: 0 };
     let correct = 0;
-    practiceExam.questions.forEach((q, idx) => {
-      const normalized = normalizeQuestion(q);
-      if (selectedAnswers[idx] === normalized.correctAnswer) {
-        correct++;
+    practiceExam.questions.forEach((q: any, idx: number) => {
+      const isOrdering = q.questionTypeId === 'order_drag' || q.questionTypeId === 'order_numbers' || q.orderedSteps;
+      if (isOrdering && q.orderedSteps) {
+        const ans = selectedAnswers[idx];
+        if (Array.isArray(ans) && JSON.stringify(ans) === JSON.stringify(q.orderedSteps)) {
+          correct++;
+        }
+      } else {
+        const normalized = normalizeQuestion(q);
+        if (selectedAnswers[idx] === normalized.correctAnswer) {
+          correct++;
+        }
       }
     });
     const total = practiceExam.questions.length;
@@ -1211,7 +1326,65 @@ export default function ExamBank() {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6 relative">
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCalculator(prev => !prev)}
+              className="gap-1.5 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-extrabold text-xs shadow-xs"
+            >
+              <Calculator className="w-4 h-4 text-blue-600" />
+              {showCalculator ? 'Close Calculator' : 'Exam Calculator'}
+            </Button>
+          </div>
+
+          {showCalculator && (
+            <div className="absolute right-6 top-16 z-50 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 p-4 w-72 space-y-3 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div className="flex items-center gap-1.5 text-xs font-extrabold text-blue-400">
+                  <Calculator className="w-3.5 h-3.5" /> Medical & Board Calculator
+                </div>
+                <button 
+                  onClick={() => setShowCalculator(false)}
+                  className="text-slate-400 hover:text-white p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-right font-mono text-xl tracking-wider text-emerald-400 overflow-x-auto">
+                {calcInput}
+              </div>
+
+              <div className="grid grid-cols-4 gap-1.5 text-xs font-bold">
+                <button onClick={() => handleCalcClear()} className="p-2 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg">C</button>
+                <button onClick={() => handleCalcDel()} className="p-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg">⌫</button>
+                <button onClick={() => handleCalcPercent()} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg">%</button>
+                <button onClick={() => handleCalcOp('/')} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg">÷</button>
+
+                <button onClick={() => handleCalcNum('7')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">7</button>
+                <button onClick={() => handleCalcNum('8')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">8</button>
+                <button onClick={() => handleCalcNum('9')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">9</button>
+                <button onClick={() => handleCalcOp('*')} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg">×</button>
+
+                <button onClick={() => handleCalcNum('4')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">4</button>
+                <button onClick={() => handleCalcNum('5')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">5</button>
+                <button onClick={() => handleCalcNum('6')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">6</button>
+                <button onClick={() => handleCalcOp('-')} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg">-</button>
+
+                <button onClick={() => handleCalcNum('1')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">1</button>
+                <button onClick={() => handleCalcNum('2')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">2</button>
+                <button onClick={() => handleCalcNum('3')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">3</button>
+                <button onClick={() => handleCalcOp('+')} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg">+</button>
+
+                <button onClick={() => handleCalcNum('0')} className="col-span-2 p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">0</button>
+                <button onClick={() => handleCalcNum('.')} className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg">.</button>
+                <button onClick={() => handleCalcEquals()} className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">=</button>
+              </div>
+            </div>
+          )}
+
           {!examCompleted ? (() => {
             const currentQ = normalizeQuestion(practiceExam.questions[currentQuestionIndex]);
             const rawCurrentQ = practiceExam.questions[currentQuestionIndex];
@@ -1316,39 +1489,115 @@ export default function ExamBank() {
                 </div>
 
                 <div className="space-y-3">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                    Select the correct answer:
-                  </label>
-                  {currentQ.options.map((opt: string, i: number) => {
-                    const isSelected = selectedAnswers[currentQuestionIndex] === opt;
-                    const isCorrect = opt === currentQ.correctAnswer;
-                    const isRevealed = showRationale[currentQuestionIndex];
+                  {(() => {
+                    const isOrdering = rawCurrentQ.questionTypeId === 'order_drag' || rawCurrentQ.questionTypeId === 'order_numbers' || rawCurrentQ.orderedSteps;
+                    if (isOrdering && rawCurrentQ.orderedSteps) {
+                      const orderedList: string[] = selectedAnswers[currentQuestionIndex] || rawCurrentQ.orderedSteps;
+                      const isRevealed = showRationale[currentQuestionIndex];
+
+                      return (
+                        <div className="space-y-3">
+                          <div className="bg-blue-50 border border-blue-200 text-blue-900 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span>Click and drag choices using the grip handle <GripVertical className="w-3.5 h-3.5 inline text-blue-600" /> or use the up/down controls to arrange them in correct priority order (1 = Highest Priority).</span>
+                          </div>
+                          <div className="space-y-2">
+                            {orderedList.map((stepText, i) => (
+                              <div
+                                key={i}
+                                draggable={!examCompleted}
+                                onDragStart={(e) => handleDragStart(e, i)}
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, currentQuestionIndex, i)}
+                                className={`p-3.5 bg-white border rounded-xl flex items-center justify-between gap-3 shadow-2xs transition-all cursor-grab active:cursor-grabbing ${
+                                  draggedIndex === i ? 'opacity-40 border-blue-400 border-dashed' : 'border-slate-200 hover:border-slate-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="text-slate-400 hover:text-slate-600 p-0.5">
+                                    <GripVertical className="w-5 h-5" />
+                                  </div>
+                                  <span className="w-7 h-7 rounded-lg bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center shrink-0">
+                                    #{i + 1}
+                                  </span>
+                                  <p className="text-xs md:text-sm font-semibold text-slate-800">{stepText}</p>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    disabled={i === 0 || examCompleted}
+                                    onClick={() => moveStep(currentQuestionIndex, i, 'up')}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 rounded-md text-slate-700"
+                                    title="Move Up"
+                                  >
+                                    <ChevronUp className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={i === orderedList.length - 1 || examCompleted}
+                                    onClick={() => moveStep(currentQuestionIndex, i, 'down')}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 rounded-md text-slate-700"
+                                    title="Move Down"
+                                  >
+                                    <ChevronDown className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {!isRevealed && (
+                            <Button
+                              size="sm"
+                              onClick={() => setShowRationale(prev => ({ ...prev, [currentQuestionIndex]: true }))}
+                              className="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+                            >
+                              Check Ordered Priorities
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    }
 
                     return (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: opt }));
-                          setShowRationale(prev => ({ ...prev, [currentQuestionIndex]: true }));
-                        }}
-                        className={`w-full p-4 rounded-xl border text-left font-medium text-sm transition-all flex items-start gap-3 ${
-                          isRevealed && isCorrect
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold ring-1 ring-emerald-400'
-                            : isRevealed && isSelected && !isCorrect
-                            ? 'bg-rose-50 border-rose-300 text-rose-950 font-bold'
-                            : isSelected
-                            ? 'bg-blue-50 border-blue-300 text-blue-900 font-bold'
-                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                          {String.fromCharCode(65 + i)}
-                        </span>
-                        <span className="flex-grow">{opt}</span>
-                        {isRevealed && isCorrect && <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />}
-                      </button>
+                      <>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                          Select the correct answer:
+                        </label>
+                        {currentQ.options.map((opt: string, i: number) => {
+                          const isSelected = selectedAnswers[currentQuestionIndex] === opt;
+                          const isCorrect = opt === currentQ.correctAnswer;
+                          const isRevealed = showRationale[currentQuestionIndex];
+
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => {
+                                setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: opt }));
+                                setShowRationale(prev => ({ ...prev, [currentQuestionIndex]: true }));
+                              }}
+                              className={`w-full p-4 rounded-xl border text-left font-medium text-sm transition-all flex items-start gap-3 ${
+                                isRevealed && isCorrect
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold ring-1 ring-emerald-400'
+                                  : isRevealed && isSelected && !isCorrect
+                                  ? 'bg-rose-50 border-rose-300 text-rose-950 font-bold'
+                                  : isSelected
+                                  ? 'bg-blue-50 border-blue-300 text-blue-900 font-bold'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                                {String.fromCharCode(65 + i)}
+                              </span>
+                              <span className="flex-grow">{opt}</span>
+                              {isRevealed && isCorrect && <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />}
+                            </button>
+                          );
+                        })}
+                      </>
                     );
-                  })}
+                  })()}
                 </div>
 
                 {showRationale[currentQuestionIndex] && (
