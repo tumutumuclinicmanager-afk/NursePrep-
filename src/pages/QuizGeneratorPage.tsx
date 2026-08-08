@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { 
   BrainCircuit, Play, Clock, CheckCircle, HelpCircle, 
   Award, ArrowRight, RotateCcw, Filter, ChevronUp, 
-  ChevronDown, ChevronLeft, ChevronRight, Layers, AlertCircle, Check, X, BookOpen, GripVertical, Calculator
+  ChevronDown, ChevronLeft, ChevronRight, Layers, AlertCircle, Check, X, BookOpen, GripVertical, Calculator, Bookmark
 } from 'lucide-react';
 import { QuestionData } from '@/types';
 import { ALL_QUIZ_QUESTIONS, NURSING_UNITS, NursingUnit, ALL_EXAM_TYPES, normalizeExamCategory } from '@/data/quizQuestions';
@@ -58,6 +58,21 @@ export default function QuizGeneratorPage({
   const [calcInput, setCalcInput] = useState('0');
   const [calcPrevInput, setCalcPrevInput] = useState<string | null>(null);
   const [calcOperation, setCalcOperation] = useState<string | null>(null);
+
+  // Flag for Review state
+  const [flaggedQuestions, setFlaggedQuestions] = useState<Set<number>>(new Set());
+
+  const toggleFlagQuestion = (idx: number) => {
+    setFlaggedQuestions(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  };
 
   const handleCalcNum = (num: string) => {
     if (calcInput === '0' || calcInput.startsWith('Drip:') || calcInput.startsWith('BMI:')) {
@@ -208,6 +223,7 @@ export default function QuizGeneratorPage({
     setUserAnswers(initialAnswers);
     setCurrentIndex(0);
     setShowRationale({});
+    setFlaggedQuestions(new Set());
     setIsCompleted(false);
     setIsQuizActive(true);
   };
@@ -905,6 +921,20 @@ export default function QuizGeneratorPage({
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => toggleFlagQuestion(currentIndex)}
+                      className={`h-8 text-xs px-3 gap-1.5 font-bold transition-all ${
+                        flaggedQuestions.has(currentIndex)
+                          ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Bookmark className={`w-3.5 h-3.5 ${flaggedQuestions.has(currentIndex) ? 'fill-amber-600 text-amber-600' : 'text-slate-500'}`} />
+                      {flaggedQuestions.has(currentIndex) ? 'Flagged' : 'Flag for Review'}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
                       disabled={currentIndex === 0}
                       onClick={() => setCurrentIndex(prev => prev - 1)}
                       className="h-8 text-xs px-3 gap-1 shadow-2xs bg-white"
@@ -951,15 +981,18 @@ export default function QuizGeneratorPage({
                     <button
                       key={idx}
                       onClick={() => setCurrentIndex(idx)}
-                      className={`w-7 h-7 text-xs font-bold rounded-lg shrink-0 transition-all ${
+                      className={`w-7 h-7 text-xs font-bold rounded-lg shrink-0 transition-all relative ${
                         currentIndex === idx
                           ? 'bg-blue-600 text-white shadow-xs scale-105'
                           : userAnswers[idx] !== undefined
                           ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
                           : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
+                      } ${flaggedQuestions.has(idx) ? 'ring-2 ring-amber-400 ring-offset-1' : ''}`}
                     >
                       {idx + 1}
+                      {flaggedQuestions.has(idx) && (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border border-white" />
+                      )}
                     </button>
                   ))}
                 </div>

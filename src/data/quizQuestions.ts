@@ -1,6 +1,16 @@
 import { QuestionData } from '@/types';
 
 export const NURSING_UNITS = [
+  'Custom',
+  'Fundamentals',
+  'Paediatric Nursing',
+  'Maternal Newborn',
+  'Pharmacology',
+  'Medsurg',
+  'Management',
+  'Leadership',
+  'Health Assessment',
+  'Dosage Calculation',
   'Medical-Surgical Nursing',
   'Maternal & Newborn Health',
   'Pediatric Nursing',

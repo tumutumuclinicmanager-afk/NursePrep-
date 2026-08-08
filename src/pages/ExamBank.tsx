@@ -425,8 +425,8 @@ const EXAM_TYPE_CATEGORIES: Record<string, string[]> = {
   'NCLEX-RN': ['Medical-Surgical Nursing', 'Pharmacology & Parenteral Therapies', 'Maternal & Newborn Health', 'Pediatric Nursing', 'Psychiatric & Mental Health', 'Community & Public Health', 'Nursing Fundamentals'],
   'NCLEX-PN': ['Basic Care & Comfort', 'Management of Care', 'Pharmacological & Parenteral Therapies', 'Reduction of Risk Potential', 'Psychosocial Integrity'],
   'NCK': ['Nursing Fundamentals', 'Medical-Surgical Nursing', 'Community & Public Health', 'Pharmacology'],
-  'ATI RN': ['Pharmacology', 'Medical-Surgical Nursing', 'Maternal-Newborn', 'Pediatrics', 'Mental Health'],
-  'ATI LPN': ['Fundamentals', 'Medical-Surgical', 'Pharmacology', 'Pediatrics'],
+  'ATI RN': ['Custom', 'Fundamentals', 'Paediatric Nursing', 'Maternal Newborn', 'Pharmacology', 'Medsurg', 'Management', 'Leadership', 'Health Assessment', 'Dosage Calculation'],
+  'ATI LPN': ['Custom', 'Fundamentals', 'Paediatric Nursing', 'Maternal Newborn', 'Pharmacology', 'Medsurg', 'Management', 'Leadership', 'Health Assessment', 'Dosage Calculation'],
   'HESI RN': ['Pediatrics', 'Maternal-Newborn', 'Med-Surg', 'Critical Care', 'Pharmacology'],
   'HESI LPN': ['Practical Nursing Fundamentals', 'Med-Surg', 'Pharmacology', 'Mental Health'],
   'Examplify RN': ['Coursework & In-School Exam', 'Advanced Clinicals', 'Pharmacology', 'Leadership'],
@@ -551,6 +551,19 @@ export default function ExamBank() {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
   const [showRationale, setShowRationale] = useState<Record<number, boolean>>({});
   const [examCompleted, setExamCompleted] = useState(false);
+  const [flaggedQuestions, setFlaggedQuestions] = useState<Set<number>>(new Set());
+
+  const toggleFlagQuestion = (idx: number) => {
+    setFlaggedQuestions(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  };
 
   // Keyboard Arrow Shortcut Navigation
   useEffect(() => {
@@ -759,6 +772,7 @@ export default function ExamBank() {
     setCurrentQuestionIndex(0);
     setSelectedAnswers({});
     setShowRationale({});
+    setFlaggedQuestions(new Set());
     setExamCompleted(false);
   };
 
@@ -951,6 +965,42 @@ export default function ExamBank() {
     return acc;
   }, {} as Record<string, ExamItem[]>);
 
+  const handleCategoryClick = (categoryName: string) => {
+    const allExamQuestions = examsList.flatMap(ex => ex.questions || []);
+    const matchedQs = [...ALL_QUIZ_QUESTIONS, ...allExamQuestions].filter(q => {
+      const matchesBoard = !selectedExamTypePage || normalizeExamCategory(q.examMode || q.category) === normalizeExamCategory(selectedExamTypePage);
+      const matchesCat = q.unitDomain?.toLowerCase().includes(categoryName.toLowerCase()) || 
+                         q.category?.toLowerCase().includes(categoryName.toLowerCase()) ||
+                         q.domain?.toLowerCase().includes(categoryName.toLowerCase()) ||
+                         q.questionStem?.toLowerCase().includes(categoryName.toLowerCase()) ||
+                         categoryName.toLowerCase() === 'custom';
+      return matchesBoard && (matchesCat || categoryName === 'Custom');
+    });
+
+    const finalQs = matchedQs.length > 0 ? matchedQs.slice(0, 25) : ALL_QUIZ_QUESTIONS.slice(0, 15);
+
+    const examItem: ExamItem = {
+      id: `cat-${selectedExamTypePage}-${categoryName}`.toLowerCase().replace(/\s+/g, '-'),
+      title: `${selectedExamTypePage || 'Exam'} - ${categoryName} Practice Module`,
+      category: selectedExamTypePage || 'ATI RN',
+      domain: categoryName,
+      price: '$0',
+      numericPrice: 0,
+      questionCount: finalQs.length,
+      durationMinutes: Math.max(15, finalQs.length * 2),
+      difficulty: 'Medium',
+      isPremium: false,
+      features: ['High-yield practice', 'Detailed rationales'],
+      icon: BookOpen,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50',
+      requiredPlan: 'free',
+      questions: finalQs
+    };
+
+    handleAction(examItem);
+  };
+
   const handleAction = (exam: ExamItem) => {
     const reqPlan = exam.requiredPlan || 'free';
     const reqLevel = PLAN_LEVELS[reqPlan] || 1;
@@ -1003,6 +1053,7 @@ export default function ExamBank() {
     setCurrentQuestionIndex(0);
     setSelectedAnswers(initialAnswers);
     setShowRationale({});
+    setFlaggedQuestions(new Set());
     setExamCompleted(false);
   };
 
@@ -1175,7 +1226,8 @@ export default function ExamBank() {
             {categoriesList.map((cat, idx) => (
               <div 
                 key={idx}
-                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all flex flex-col justify-between space-y-4 group"
+                onClick={() => handleCategoryClick(cat)}
+                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-400 hover:shadow-md transition-all flex flex-col justify-between space-y-4 group cursor-pointer"
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -1400,6 +1452,20 @@ export default function ExamBank() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => toggleFlagQuestion(currentQuestionIndex)}
+                        className={`h-8 text-xs px-3 gap-1.5 font-bold transition-all ${
+                          flaggedQuestions.has(currentQuestionIndex)
+                            ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Bookmark className={`w-3.5 h-3.5 ${flaggedQuestions.has(currentQuestionIndex) ? 'fill-amber-600 text-amber-600' : 'text-slate-500'}`} />
+                        {flaggedQuestions.has(currentQuestionIndex) ? 'Flagged' : 'Flag for Review'}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
                         disabled={currentQuestionIndex === 0}
                         onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
                         className="h-8 text-xs px-3 gap-1 bg-white"
@@ -1442,15 +1508,18 @@ export default function ExamBank() {
                       <button
                         key={idx}
                         onClick={() => setCurrentQuestionIndex(idx)}
-                        className={`w-7 h-7 text-xs font-bold rounded-lg shrink-0 transition-all ${
+                        className={`w-7 h-7 text-xs font-bold rounded-lg shrink-0 transition-all relative ${
                           currentQuestionIndex === idx
                             ? 'bg-blue-600 text-white shadow-xs scale-105'
                             : selectedAnswers[idx] !== undefined
                             ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
                             : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
+                        } ${flaggedQuestions.has(idx) ? 'ring-2 ring-amber-400 ring-offset-1' : ''}`}
                       >
                         {idx + 1}
+                        {flaggedQuestions.has(idx) && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border border-white" />
+                        )}
                       </button>
                     ))}
                   </div>

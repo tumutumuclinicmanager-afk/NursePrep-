@@ -38,6 +38,16 @@ const DEFAULT_EXAM_MODES = [
 ];
 
 const DEFAULT_UNITS = [
+  'Custom',
+  'Fundamentals',
+  'Paediatric Nursing',
+  'Maternal Newborn',
+  'Pharmacology',
+  'Medsurg',
+  'Management',
+  'Leadership',
+  'Health Assessment',
+  'Dosage Calculation',
   'Medical-Surgical Nursing (MedSurg)',
   'Pharmacology & Parenteral Therapies',
   'Pediatrics & Child Health',
