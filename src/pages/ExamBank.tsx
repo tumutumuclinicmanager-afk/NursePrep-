@@ -970,25 +970,25 @@ export default function ExamBank() {
     const allExamQuestions = examsList.flatMap(ex => ex.questions || []);
     const categoryExamBundles = examsList.filter(ex => 
       (!selectedExamTypePage || normalizeExamCategory(ex.category) === normalizeExamCategory(selectedExamTypePage)) &&
-      (ex.domain?.toLowerCase().includes(categoryName.toLowerCase()) || ex.title?.toLowerCase().includes(categoryName.toLowerCase()))
+      (ex.domain?.toLowerCase().includes(categoryName.toLowerCase()) || ex.title?.toLowerCase().includes(categoryName.toLowerCase()) || ex.category?.toLowerCase().includes(categoryName.toLowerCase()))
     );
 
-    const matchedQs = [...ALL_QUIZ_QUESTIONS, ...allExamQuestions].filter(q => {
+    const specificQs = [...allExamQuestions].filter(q => {
       const matchesBoard = !selectedExamTypePage || normalizeExamCategory(q.examMode || q.category) === normalizeExamCategory(selectedExamTypePage);
       const matchesCat = q.unitDomain?.toLowerCase().includes(categoryName.toLowerCase()) || 
                          q.category?.toLowerCase().includes(categoryName.toLowerCase()) ||
-                         q.domain?.toLowerCase().includes(categoryName.toLowerCase()) ||
-                         q.questionStem?.toLowerCase().includes(categoryName.toLowerCase()) ||
-                         categoryName.toLowerCase() === 'custom';
-      return matchesBoard && (matchesCat || categoryName === 'Custom');
+                         q.domain?.toLowerCase().includes(categoryName.toLowerCase());
+      return matchesBoard && matchesCat;
     });
 
-    if (matchedQs.length === 0 && categoryExamBundles.length === 0) {
+    const hasExams = categoryExamBundles.length > 0 || specificQs.length > 0;
+
+    if (!hasExams) {
       setNoExamsModalMessage(`No exams or practice questions are available yet for "${categoryName}" under ${selectedExamTypePage || 'this board'}. Please check back soon or try another category.`);
       return;
     }
 
-    const finalQs = matchedQs.length > 0 ? matchedQs.slice(0, 25) : categoryExamBundles.flatMap(e => e.questions || []).slice(0, 25);
+    const finalQs = specificQs.length > 0 ? specificQs.slice(0, 25) : categoryExamBundles.flatMap(e => e.questions || []).slice(0, 25);
 
     if (finalQs.length === 0) {
       setNoExamsModalMessage(`No exams or practice questions are available yet for "${categoryName}" under ${selectedExamTypePage || 'this board'}. Please check back soon or try another category.`);
