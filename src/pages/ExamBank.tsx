@@ -1195,13 +1195,156 @@ export default function ExamBank() {
     }
   };
 
+  const modalsContent = (
+    <>
+      {/* Subscription Required Lock Modal */}
+      {requiredPlanModalExam && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95">
+            <div className="p-6 bg-gradient-to-br from-slate-900 to-blue-950 text-white relative">
+              <button 
+                onClick={() => setRequiredPlanModalExam(null)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="w-12 h-12 bg-amber-500/20 border border-amber-400/40 text-amber-400 rounded-xl flex items-center justify-center mb-3">
+                <Crown className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-extrabold tracking-tight">Subscription Upgrade Required</h3>
+              <p className="text-xs text-slate-300 mt-1">
+                Access to <strong>{requiredPlanModalExam.title}</strong> is restricted.
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs space-y-2 text-amber-950">
+                <div className="flex justify-between items-center font-bold">
+                  <span>Required Subscription:</span>
+                  <span className="px-2 py-0.5 bg-amber-200 text-amber-900 rounded font-extrabold uppercase">
+                    {requiredPlanModalExam.requiredPlan} Plan
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Your Current Plan:</span>
+                  <span className="font-bold uppercase">{userSubscriptionPlan} Plan</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Upgrade your subscription plan to unlock full access to this exam, complete question banks, and detailed clinical explanations.
+              </p>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <Button 
+                  onClick={() => {
+                    setRequiredPlanModalExam(null);
+                    navigate('/dashboard/pricing');
+                  }}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold gap-2 py-3 shadow-md"
+                >
+                  <Crown className="w-4 h-4 fill-white" /> Upgrade Subscription Plan
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setRequiredPlanModalExam(null)}
+                  className="w-full text-slate-600"
+                >
+                  Maybe Later
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* M-Pesa Payment Details Modal */}
+      {showPaymentModal && selectedBundle && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-start gap-4">
+              <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center shrink-0">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">M-Pesa Payment Details</h3>
+                <p className="text-xs text-slate-500 mt-1">Pay for {selectedBundle.title}</p>
+              </div>
+            </div>
+            
+            <form onSubmit={handleSubmitPayment} className="p-6 space-y-4">
+              <div className="p-4 bg-slate-100 border border-slate-200 rounded-lg text-sm mb-4">
+                <p className="mb-2">1. Go to M-Pesa Menu</p>
+                <p className="mb-2">2. Select Lipa na M-Pesa -&gt; Buy Goods and Services</p>
+                <p className="mb-2">3. Enter Till Number: <strong>123456</strong></p>
+                <p className="mb-2">4. Enter Amount: <strong>{selectedBundle.price}</strong></p>
+                <p>5. Enter M-Pesa Pin and confirm.</p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Enter M-Pesa Reference Code</label>
+                <input 
+                  type="text" 
+                  value={mpesaRef}
+                  onChange={(e) => setMpesaRef(e.target.value.toUpperCase())}
+                  placeholder="e.g. SAX8921JHK"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm font-mono uppercase"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowPaymentModal(false)}>Cancel</Button>
+                <Button type="submit" disabled={isSubmitting || !mpesaRef} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50">
+                  {isSubmitting ? 'Submitting...' : 'Verify Payment'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Favorite Toast Notification */}
+      {favoriteToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
+          <BookmarkCheck className="w-5 h-5 text-amber-400 fill-amber-400" />
+          <span className="text-xs font-bold">{favoriteToast}</span>
+        </div>
+      )}
+
+      {/* No Exams Modal */}
+      {noExamsModalMessage && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-slate-100 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl mx-auto flex items-center justify-center text-2xl font-bold">
+              📚
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-extrabold text-slate-900">No Exams Available Yet</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                {noExamsModalMessage}
+              </p>
+            </div>
+            <Button
+              onClick={() => setNoExamsModalMessage(null)}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md"
+            >
+              Got it
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   if (selectedExamTypePage) {
     const typeExams = examsList.filter(ex => ex.category === selectedExamTypePage || normalizeExamCategory(ex.category) === normalizeExamCategory(selectedExamTypePage));
     const categoriesList = EXAM_TYPE_CATEGORIES[selectedExamTypePage] || ['Core Concepts', 'Clinical Specialties', 'Diagnostic Assessment', 'Practice Mock Bank'];
     const totalQs = boardQuestionCounts[selectedExamTypePage] || typeExams.reduce((acc, curr) => acc + curr.questionCount, 0);
 
     return (
-      <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 animate-in fade-in">
+      <div className="min-h-screen bg-slate-50/50 pb-20">
+        <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 animate-in fade-in">
         {/* Header Banner */}
         <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-6 md:p-10 shadow-lg border border-slate-800 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
@@ -1355,12 +1498,15 @@ export default function ExamBank() {
           )}
         </div>
       </div>
+      {modalsContent}
+    </div>
     );
   }
 
   if (practiceExam) {
     return (
-      <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6 animate-in fade-in">
+      <div className="min-h-screen bg-slate-50/50 pb-20">
+        <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6 animate-in fade-in">
         <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-lg flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400 block">
@@ -1745,6 +1891,8 @@ export default function ExamBank() {
           )}
         </div>
       </div>
+      {modalsContent}
+    </div>
     );
   }
 
@@ -2240,143 +2388,7 @@ export default function ExamBank() {
         </div>
       )}
 
-      {/* Subscription Required Lock Modal */}
-      {requiredPlanModalExam && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95">
-            <div className="p-6 bg-gradient-to-br from-slate-900 to-blue-950 text-white relative">
-              <button 
-                onClick={() => setRequiredPlanModalExam(null)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <div className="w-12 h-12 bg-amber-500/20 border border-amber-400/40 text-amber-400 rounded-xl flex items-center justify-center mb-3">
-                <Crown className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-extrabold tracking-tight">Subscription Upgrade Required</h3>
-              <p className="text-xs text-slate-300 mt-1">
-                Access to <strong>{requiredPlanModalExam.title}</strong> is restricted.
-              </p>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs space-y-2 text-amber-950">
-                <div className="flex justify-between items-center font-bold">
-                  <span>Required Subscription:</span>
-                  <span className="px-2 py-0.5 bg-amber-200 text-amber-900 rounded font-extrabold uppercase">
-                    {requiredPlanModalExam.requiredPlan} Plan
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>Your Current Plan:</span>
-                  <span className="font-bold uppercase">{userSubscriptionPlan} Plan</span>
-                </div>
-              </div>
-
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Upgrade your subscription plan to unlock full access to this exam, complete question banks, and detailed clinical explanations.
-              </p>
-
-              <div className="pt-2 flex flex-col gap-2">
-                <Button 
-                  onClick={() => {
-                    setRequiredPlanModalExam(null);
-                    navigate('/dashboard/pricing');
-                  }}
-                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold gap-2 py-3 shadow-md"
-                >
-                  <Crown className="w-4 h-4 fill-white" /> Upgrade Subscription Plan
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => setRequiredPlanModalExam(null)}
-                  className="w-full text-slate-600"
-                >
-                  Maybe Later
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* M-Pesa Payment Details Modal */}
-      {showPaymentModal && selectedBundle && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-start gap-4">
-              <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center shrink-0">
-                <DollarSign className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900">M-Pesa Payment Details</h3>
-                <p className="text-xs text-slate-500 mt-1">Pay for {selectedBundle.title}</p>
-              </div>
-            </div>
-            
-            <form onSubmit={handleSubmitPayment} className="p-6 space-y-4">
-              <div className="p-4 bg-slate-100 border border-slate-200 rounded-lg text-sm mb-4">
-                <p className="mb-2">1. Go to M-Pesa Menu</p>
-                <p className="mb-2">2. Select Lipa na M-Pesa -&gt; Buy Goods and Services</p>
-                <p className="mb-2">3. Enter Till Number: <strong>123456</strong></p>
-                <p className="mb-2">4. Enter Amount: <strong>{selectedBundle.price}</strong></p>
-                <p>5. Enter M-Pesa Pin and confirm.</p>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Enter M-Pesa Reference Code</label>
-                <input 
-                  type="text" 
-                  value={mpesaRef}
-                  onChange={(e) => setMpesaRef(e.target.value.toUpperCase())}
-                  placeholder="e.g. SAX8921JHK"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm font-mono uppercase"
-                  required
-                />
-              </div>
-
-              <div className="flex gap-2 mt-6">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowPaymentModal(false)}>Cancel</Button>
-                <Button type="submit" disabled={isSubmitting || !mpesaRef} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50">
-                  {isSubmitting ? 'Submitting...' : 'Verify Payment'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Favorite Toast Notification */}
-      {favoriteToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
-          <BookmarkCheck className="w-5 h-5 text-amber-400 fill-amber-400" />
-          <span className="text-xs font-bold">{favoriteToast}</span>
-        </div>
-      )}
-
-      {/* No Exams Modal */}
-      {noExamsModalMessage && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-slate-100 text-center animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl mx-auto flex items-center justify-center text-2xl font-bold">
-              📚
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-extrabold text-slate-900">No Exams Available Yet</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                {noExamsModalMessage}
-              </p>
-            </div>
-            <Button
-              onClick={() => setNoExamsModalMessage(null)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md"
-            >
-              Got it
-            </Button>
-          </div>
-        </div>
-      )}
+      {modalsContent}
     </div>
   );
 }
