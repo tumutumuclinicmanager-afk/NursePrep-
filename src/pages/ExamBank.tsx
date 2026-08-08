@@ -967,13 +967,14 @@ export default function ExamBank() {
   }, {} as Record<string, ExamItem[]>);
 
   const handleCategoryClick = (categoryName: string) => {
-    const allExamQuestions = examsList.flatMap(ex => ex.questions || []);
+    const allExamQuestions = [...ALL_QUIZ_QUESTIONS, ...examsList.flatMap(ex => ex.questions || [])];
+    
     const categoryExamBundles = examsList.filter(ex => 
       (!selectedExamTypePage || normalizeExamCategory(ex.category) === normalizeExamCategory(selectedExamTypePage)) &&
       (ex.domain?.toLowerCase().includes(categoryName.toLowerCase()) || ex.title?.toLowerCase().includes(categoryName.toLowerCase()) || ex.category?.toLowerCase().includes(categoryName.toLowerCase()))
     );
 
-    const specificQs = [...allExamQuestions].filter(q => {
+    const specificQs = allExamQuestions.filter(q => {
       const matchesBoard = !selectedExamTypePage || normalizeExamCategory(q.examMode || q.category) === normalizeExamCategory(selectedExamTypePage);
       const matchesCat = q.unitDomain?.toLowerCase().includes(categoryName.toLowerCase()) || 
                          q.category?.toLowerCase().includes(categoryName.toLowerCase()) ||
