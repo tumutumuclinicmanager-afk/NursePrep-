@@ -530,6 +530,7 @@ export default function ExamBank() {
   // Favorites / Bookmarks state
   const [favoritesList, setFavoritesList] = useState<FavoriteItem[]>([]);
   const [favoriteToast, setFavoriteToast] = useState<string | null>(null);
+  const [noExamsModalMessage, setNoExamsModalMessage] = useState<string | null>(null);
 
   // Live Actual Question Counts tracking across all sources
   const [boardQuestionCounts, setBoardQuestionCounts] = useState<Record<string, number>>({
@@ -967,6 +968,11 @@ export default function ExamBank() {
 
   const handleCategoryClick = (categoryName: string) => {
     const allExamQuestions = examsList.flatMap(ex => ex.questions || []);
+    const categoryExamBundles = examsList.filter(ex => 
+      (!selectedExamTypePage || normalizeExamCategory(ex.category) === normalizeExamCategory(selectedExamTypePage)) &&
+      (ex.domain?.toLowerCase().includes(categoryName.toLowerCase()) || ex.title?.toLowerCase().includes(categoryName.toLowerCase()))
+    );
+
     const matchedQs = [...ALL_QUIZ_QUESTIONS, ...allExamQuestions].filter(q => {
       const matchesBoard = !selectedExamTypePage || normalizeExamCategory(q.examMode || q.category) === normalizeExamCategory(selectedExamTypePage);
       const matchesCat = q.unitDomain?.toLowerCase().includes(categoryName.toLowerCase()) || 
@@ -977,7 +983,17 @@ export default function ExamBank() {
       return matchesBoard && (matchesCat || categoryName === 'Custom');
     });
 
-    const finalQs = matchedQs.length > 0 ? matchedQs.slice(0, 25) : ALL_QUIZ_QUESTIONS.slice(0, 15);
+    if (matchedQs.length === 0 && categoryExamBundles.length === 0) {
+      setNoExamsModalMessage(`No exams or practice questions are available yet for "${categoryName}" under ${selectedExamTypePage || 'this board'}. Please check back soon or try another category.`);
+      return;
+    }
+
+    const finalQs = matchedQs.length > 0 ? matchedQs.slice(0, 25) : categoryExamBundles.flatMap(e => e.questions || []).slice(0, 25);
+
+    if (finalQs.length === 0) {
+      setNoExamsModalMessage(`No exams or practice questions are available yet for "${categoryName}" under ${selectedExamTypePage || 'this board'}. Please check back soon or try another category.`);
+      return;
+    }
 
     const examItem: ExamItem = {
       id: `cat-${selectedExamTypePage}-${categoryName}`.toLowerCase().replace(/\s+/g, '-'),
@@ -2335,6 +2351,29 @@ export default function ExamBank() {
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
           <BookmarkCheck className="w-5 h-5 text-amber-400 fill-amber-400" />
           <span className="text-xs font-bold">{favoriteToast}</span>
+        </div>
+      )}
+
+      {/* No Exams Modal */}
+      {noExamsModalMessage && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-slate-100 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl mx-auto flex items-center justify-center text-2xl font-bold">
+              📚
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-extrabold text-slate-900">No Exams Available Yet</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                {noExamsModalMessage}
+              </p>
+            </div>
+            <Button
+              onClick={() => setNoExamsModalMessage(null)}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md"
+            >
+              Got it
+            </Button>
+          </div>
         </div>
       )}
     </div>

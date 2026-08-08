@@ -69,6 +69,8 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
   const [availableQuestions, setAvailableQuestions] = useState<QuestionData[]>([]);
   const [customExamModes, setCustomExamModes] = useState<any[]>([]);
   const [newExamModeName, setNewExamModeName] = useState('');
+  const [customCategories, setCustomCategories] = useState<any[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [loading, setLoading] = useState(true);
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingExamId, setEditingExamId] = useState<string | null>(null);
@@ -127,6 +129,18 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
         console.warn("Error fetching exam modes:", e);
       }
 
+      // 4. Fetch Categories
+      try {
+        const catsSnap = await getDocs(query(collection(db, 'categories')));
+        const deletedCats = JSON.parse(localStorage.getItem('nurseprep_deleted_categories') || '[]');
+        const catsList = catsSnap.docs
+          .filter(docSnap => !deletedCats.includes(docSnap.id))
+          .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        setCustomCategories(catsList);
+      } catch (e) {
+        console.warn("Error fetching categories:", e);
+      }
+
     } catch (err) {
       console.error("Error fetching exams in publisher:", err);
     } finally {
@@ -172,9 +186,46 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
     }
   };
 
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    try {
+      await addDoc(collection(db, 'categories'), {
+        name: newCategoryName.trim(),
+        createdAt: new Date().toISOString()
+      });
+      setNewCategoryName('');
+      fetchExamsAndQuestions();
+      alert('New Category created successfully!');
+    } catch (err) {
+      console.error('Error adding category:', err);
+      alert('Failed to create category.');
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this custom category?")) return;
+    setCustomCategories(prev => prev.filter(c => c.id !== id));
+    try {
+      await deleteDoc(doc(db, 'categories', id));
+      const deletedCats = JSON.parse(localStorage.getItem('nurseprep_deleted_categories') || '[]');
+      if (!deletedCats.includes(id)) {
+        deletedCats.push(id);
+        localStorage.setItem('nurseprep_deleted_categories', JSON.stringify(deletedCats));
+      }
+    } catch (err) {
+      console.warn('Error deleting category from Firestore:', err);
+    }
+  };
+
   const ALL_COMBINED_EXAM_TYPES = [
     ...DEFAULT_EXAM_TYPES,
     ...customExamModes.map(m => m.name)
+  ];
+
+  const ALL_COMBINED_DOMAINS = [
+    ...DEFAULT_DOMAINS,
+    ...customCategories.map(c => c.name)
   ];
 
   const handleOpenCreateModal = () => {
@@ -410,6 +461,61 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
         </div>
       </div>
 
+      {/* Categories & Specialty Domains Management Card */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-emerald-600" />
+              Manage Categories & Specialty Domains ({ALL_COMBINED_DOMAINS.length})
+            </h3>
+            <p className="text-slate-500 text-xs">Super admins can create new custom categories and specialty domains for exams and question banks.</p>
+          </div>
+          <form onSubmit={handleAddCategory} className="flex items-center gap-2">
+            <input 
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="New Category (e.g., Gerontology, Informatics)"
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500 w-64"
+            />
+            <Button type="submit" size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1">
+              <Plus className="w-3.5 h-3.5" /> Add Category
+            </Button>
+          </form>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-2">
+          {ALL_COMBINED_DOMAINS.map((domainName) => {
+            const isCustom = customCategories.some(c => c.name === domainName);
+            const customObj = customCategories.find(c => c.name === domainName);
+            return (
+              <div 
+                key={domainName}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-2 ${
+                  isCustom ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-slate-50 text-slate-700 border-slate-200'
+                }`}
+              >
+                <span>{domainName}</span>
+                {isCustom && customObj && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCategory(customObj.id)}
+                    className="text-rose-500 hover:text-rose-700 p-0.5 rounded"
+                    title="Delete Custom Category"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {!isCustom && (
+                  <span className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Default</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Main List of Exams */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
@@ -593,7 +699,7 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
                       onChange={(e) => setDomain(e.target.value)}
                       className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
                     >
-                      {DEFAULT_DOMAINS.map(d => (
+                      {ALL_COMBINED_DOMAINS.map(d => (
                         <option key={d} value={d}>{d}</option>
                       ))}
                     </select>
