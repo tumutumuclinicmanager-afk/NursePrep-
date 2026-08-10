@@ -1,6 +1,5 @@
 import React from "react";
 import "./NurseLoadingAnimation.css";
-import nurseSceneImg from "./nurse-scene.png";
 
 interface NurseLoadingAnimationProps {
   title?: string;
@@ -26,7 +25,7 @@ export default function NurseLoadingAnimation({
       <div className="nurse-artwork-wrapper">
         <div className="nurse-pulse-ring"></div>
         <img
-          src={nurseSceneImg}
+          src="/nurse-scene.png"
           alt="Friendly Nurse 3D Artwork"
           className="nurse-artwork"
           referrerPolicy="no-referrer"
