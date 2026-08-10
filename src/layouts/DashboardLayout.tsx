@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, BrainCircuit, FileText, Bell, LogOut, ChevronRight, Menu, X, Video, MessageSquare, Edit3, Database, Award } from 'lucide-react';
+import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, BrainCircuit, FileText, Bell, LogOut, ChevronRight, Menu, X, Video, MessageSquare, Edit3, Database, Award, Server } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { auth, signOut, onAuthStateChanged } from '@/lib/firebase';
@@ -67,6 +67,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
         { name: 'User Management', icon: GraduationCap, path: '/admin/users' },
         { name: 'Payments', icon: FileText, path: '/admin/payments' },
         { name: 'Analytics', icon: Brain, path: '/admin/analytics' },
+        { name: 'Cloud Scalability', icon: Server, path: '/admin/scalability' },
       ];
     }
     if (userRole === 'staff') {
@@ -75,6 +76,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
         { name: 'Upload Exams', icon: FileText, path: '/staff/upload' },
         { name: 'Live Sessions', icon: Video, path: '/staff/sessions' },
         { name: 'Student Queries', icon: MessageSquare, path: '/staff/queries' },
+        { name: 'Cloud Scalability', icon: Server, path: '/staff/scalability' },
       ];
     }
     return [
@@ -84,6 +86,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
       { name: 'Practice Exam Generator', icon: Brain, path: '/dashboard/generator' },
       { name: 'Performance', icon: FileText, path: '/dashboard/performance' },
       { name: 'AI Study Assistant', icon: BrainCircuit, path: '/dashboard/assistant' },
+      { name: 'Cloud Scalability', icon: Server, path: '/dashboard/scalability' },
     ];
   };
 

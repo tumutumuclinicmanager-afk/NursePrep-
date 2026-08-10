@@ -28,6 +28,7 @@ import QuizGeneratorPage from './pages/QuizGeneratorPage';
 import StudyAssistantPage from './pages/StudyAssistantPage';
 import MyCourses from './pages/MyCourses';
 import PerformancePage from './pages/PerformancePage';
+import ScalabilityDashboard from './pages/ScalabilityDashboard';
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -115,6 +116,7 @@ export default function App() {
           <Route path="generator" element={<QuizGeneratorPage />} />
           <Route path="courses" element={<MyCourses />} />
           <Route path="performance" element={<PerformancePage />} />
+          <Route path="scalability" element={<ScalabilityDashboard />} />
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
         </Route>
 
@@ -130,6 +132,7 @@ export default function App() {
           <Route path="upload" element={<UploadExams />} />
           <Route path="sessions" element={<LiveSessions />} />
           <Route path="queries" element={<StudentQueries />} />
+          <Route path="scalability" element={<ScalabilityDashboard />} />
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
         </Route>
         
@@ -148,6 +151,7 @@ export default function App() {
           <Route path="users" element={<UserManagement />} />
           <Route path="payments" element={<Payments />} />
           <Route path="analytics" element={<Analytics />} />
+          <Route path="scalability" element={<ScalabilityDashboard />} />
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
         </Route>
       </Routes>
