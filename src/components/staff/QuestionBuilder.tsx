@@ -76,6 +76,14 @@ const INITIAL_QUESTION_TYPES: QuestionTypeDefinition[] = [
   { id: 'hotspot', label: 'Hotspot', description: 'Identify or click target region/coordinates on an image or chart', category: 'Image & Media' },
   { id: 'order_numbers', label: 'Ordering : Numbers', description: 'Sequence clinical steps or priorities using numbers (1, 2, 3...)', category: 'Interactive & Ordering' },
   { id: 'order_drag', label: 'Ordering : Drag and Drop', description: 'Drag procedural steps into correct chronological sequence', category: 'Interactive & Ordering' },
+  { id: 'case_based', label: 'Case Based', description: 'Clinical scenario based case question', category: 'NGN Next-Gen' },
+  { id: 'case_checkbox', label: 'Case Based : CheckBox', description: 'Case study with multi-select checkbox options', category: 'NGN Next-Gen' },
+  { id: 'case_highlight', label: 'Case Based : HighLight', description: 'Case study highlighting key clinical findings', category: 'NGN Next-Gen' },
+  { id: 'case_dropdown', label: 'Case Based : DropDown', description: 'Case study with inline clinical dropdown selections', category: 'NGN Next-Gen' },
+  { id: 'case_dynamic_dnd', label: 'Case Based : Dynamic DnD', description: 'Case study with dynamic drag and drop categorization', category: 'NGN Next-Gen' },
+  { id: 'case_distinct_dnd', label: 'Case Based : Distinct DnD', description: 'Case study with distinct category drag and drop matching', category: 'NGN Next-Gen' },
+  { id: 'case_stratified_dnd', label: 'Case Based : Stratified DnD', description: 'Case study with stratified hierarchical drag and drop ordering', category: 'NGN Next-Gen' },
+  { id: 'file_upload', label: 'File Upload', description: 'Candidate uploads document or clinical artifact for evaluation', category: 'Standard' },
 ];
 
 export default function QuestionBuilder({ onQuestionSaved }: { onQuestionSaved?: () => void }) {

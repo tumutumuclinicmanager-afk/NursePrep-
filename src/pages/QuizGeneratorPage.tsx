@@ -742,9 +742,21 @@ export default function QuizGeneratorPage({
                 <option value="All">All Formats (MCQ, SATA, Math, Ordering, T/F)</option>
                 <option value="single_choice">Multiple Choice (Single Answer)</option>
                 <option value="multiple_select">Select All That Apply (SATA)</option>
-                <option value="numeric">Dosage Math & Numerical Calculations</option>
-                <option value="order_drag">Prioritization & Sequencing</option>
                 <option value="true_false">True or False</option>
+                <option value="numeric">Dosage Math & Numerical Calculations</option>
+                <option value="short_answer">Short Answer</option>
+                <option value="fill_blank">Fill in the Blank</option>
+                <option value="hotspot">Hotspot</option>
+                <option value="order_numbers">Ordering : Numbers</option>
+                <option value="order_drag">Ordering : Drag and Drop</option>
+                <option value="case_based">Case Based</option>
+                <option value="case_checkbox">Case Based : CheckBox</option>
+                <option value="case_highlight">Case Based : HighLight</option>
+                <option value="case_dropdown">Case Based : DropDown</option>
+                <option value="case_dynamic_dnd">Case Based : Dynamic DnD</option>
+                <option value="case_distinct_dnd">Case Based : Distinct DnD</option>
+                <option value="case_stratified_dnd">Case Based : Stratified DnD</option>
+                <option value="file_upload">File Upload</option>
               </select>
             </div>
 

@@ -18,6 +18,14 @@ export type QuestionTypeId =
   | 'sieve_bowtie'
   | 'matrix_grid'
   | 'case_exhibit'
+  | 'case_based'
+  | 'case_checkbox'
+  | 'case_highlight'
+  | 'case_dropdown'
+  | 'case_dynamic_dnd'
+  | 'case_distinct_dnd'
+  | 'case_stratified_dnd'
+  | 'file_upload'
   | string;
 
 export interface QuestionTypeDefinition {
