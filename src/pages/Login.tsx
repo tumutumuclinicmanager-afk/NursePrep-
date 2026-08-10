@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Stethoscope, Chrome } from 'lucide-react';
+import { Chrome } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { auth, db, googleProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import NurseLoadingAnimation from '@/components/NurseLoadingAnimation';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -158,14 +159,16 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-6 bg-slate-50">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-        <div className="p-8 pb-6 border-b border-slate-100 text-center">
-          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white mx-auto mb-4">
-            <Stethoscope className="w-6 h-6" />
-          </div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Welcome Back</h2>
-          <p className="text-slate-500 mt-2 text-sm">Sign in to your Nurse Prep account to continue your journey.</p>
+    <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center p-6 bg-slate-50 relative overflow-hidden py-12">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative z-20 mb-6">
+        <div className="pt-6 pb-2 border-b border-slate-100 flex justify-center bg-slate-50/50">
+          <NurseLoadingAnimation 
+            title="Welcome Back" 
+            subtitle="Sign in to your Nurse Prep account to continue your journey." 
+            progress={loading ? 85 : 100}
+            showStatus={false}
+            showProgress={false}
+          />
         </div>
 
         <div className="p-8">
