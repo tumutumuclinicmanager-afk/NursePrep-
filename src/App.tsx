@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 import { PublicLayout } from './layouts/PublicLayout';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import Home from './pages/Home';
@@ -89,6 +90,7 @@ function PublicOrDashboardExams() {
 export default function App() {
   return (
     <BrowserRouter>
+      <VercelAnalytics />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
