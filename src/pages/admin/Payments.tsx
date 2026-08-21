@@ -11,8 +11,8 @@ export default function Payments() {
   // Merchant Account Configuration State
   const [stripeAccountEmail, setStripeAccountEmail] = useState('');
   const [stripeLiveKey, setStripeLiveKey] = useState('');
-  const [mpesaTillNumber, setMpesaTillNumber] = useState('892100');
-  const [mpesaBusinessName, setMpesaBusinessName] = useState('NursePrep Qbank');
+  const [mpesaTillNumber, setMpesaTillNumber] = useState('');
+  const [mpesaBusinessName, setMpesaBusinessName] = useState('');
   const [payoutBank, setPayoutBank] = useState('');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
@@ -180,20 +180,20 @@ export default function Payments() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded text-xs">
-                        {payment.receiptNumber || payment.mpesaRef || 'STR-98231'}
+                        {payment.receiptNumber || payment.mpesaRef || 'N/A'}
                       </span>
                     </td>
                     <td className="px-6 py-4 font-bold text-emerald-600">
-                      {payment.amountUsd ? `$${payment.amountUsd}` : payment.amount}
+                      {payment.amountUsd ? `$${payment.amountUsd}` : (payment.amount || payment.amountKes ? `KSh ${(payment.amount || payment.amountKes).toLocaleString()}` : '0')}
                     </td>
-                    <td className="px-6 py-4 text-slate-500 text-xs">{payment.date}</td>
+                    <td className="px-6 py-4 text-slate-500 text-xs">{payment.createdAt ? new Date(payment.createdAt).toLocaleDateString() : (payment.date || 'N/A')}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs font-bold rounded-full ${
                         payment.status === 'Completed' || payment.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
                         payment.status === 'Pending' ? 'bg-amber-100 text-amber-700' :
                         'bg-rose-100 text-rose-700'
                       }`}>
-                        {payment.status}
+                        {payment.status || 'Pending'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -207,6 +207,13 @@ export default function Payments() {
                     </td>
                   </tr>
                 ))}
+                {payments.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-slate-400 italic">
+                      No payment transactions recorded in the database yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

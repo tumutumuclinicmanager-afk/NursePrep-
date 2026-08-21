@@ -83,7 +83,7 @@ export function NotificationBell({ userRole = 'student' }: { userRole?: string }
   const popoverRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Load & sync notifications from Firestore with automatic seeding if empty
+  // Load & sync notifications from Firestore
   useEffect(() => {
     let unsubscribe: () => void = () => {};
 
@@ -91,29 +91,15 @@ export function NotificationBell({ userRole = 'student' }: { userRole?: string }
       const q = query(collection(db, 'notifications'));
       unsubscribe = onSnapshot(q, (snapshot) => {
         if (!snapshot || snapshot.empty) {
-          // Populate local state immediately so user sees notifications
-          setNotifications(DEFAULT_NOTIFICATIONS.map((n, i) => ({ ...n, id: `notif-seed-${i + 1}` })));
-
-          // Seed initial default notifications into Firestore in background
-          DEFAULT_NOTIFICATIONS.forEach(async (notif, idx) => {
-            try {
-              const notifId = `notif-seed-${idx + 1}`;
-              await setDoc(doc(db, 'notifications', notifId), {
-                ...notif,
-                createdAt: new Date().toISOString()
-              });
-            } catch (err) {
-              console.warn('Error seeding notifications:', err);
-            }
-          });
+          setNotifications([]);
         } else {
           const loaded: NotificationItem[] = snapshot.docs.map(docSnap => {
             const data = docSnap.data() || {};
             return {
               id: docSnap.id,
-              title: data.title || 'Alert',
+              title: data.title || 'Notification',
               message: data.message || '',
-              timestamp: data.timestamp || 'Just now',
+              timestamp: data.timestamp || 'Recent',
               read: Boolean(data.read),
               type: data.type || 'system',
               link: data.link || '',
@@ -123,16 +109,15 @@ export function NotificationBell({ userRole = 'student' }: { userRole?: string }
 
           // Filter by targetRole if specified
           const userNotifs = loaded.filter(n => !n.targetRole || n.targetRole === 'all' || n.targetRole === userRole);
-          setNotifications(userNotifs.length > 0 ? userNotifs : DEFAULT_NOTIFICATIONS.map((n, i) => ({ ...n, id: `local-${i}` })));
+          setNotifications(userNotifs);
         }
       }, (err) => {
         console.warn('Notification snapshot warning:', err);
-        // Fallback local memory state if Firestore encounters network/permission issues
-        setNotifications(DEFAULT_NOTIFICATIONS.map((n, i) => ({ ...n, id: `local-${i}` })));
+        setNotifications([]);
       });
     } catch (e) {
       console.warn('Failed to setup notifications listener:', e);
-      setNotifications(DEFAULT_NOTIFICATIONS.map((n, i) => ({ ...n, id: `local-${i}` })));
+      setNotifications([]);
     }
 
     return () => unsubscribe();

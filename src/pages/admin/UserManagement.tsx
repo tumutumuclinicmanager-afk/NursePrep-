@@ -29,18 +29,11 @@ export default function UserManagement() {
         console.warn("Firestore fetch error, falling back to local storage:", dbErr);
       }
 
-      // Default system admin accounts
-      const defaultUsers = [
-        { id: 'def-3', name: 'Godfrey Wangechi', email: 'wangechigodfrey77@gmail.com', role: 'Super Admin', status: 'Active', added: '2023-01-01' },
-        { id: 'def-4', name: 'System Admin', email: 'admin@nurseprep.com', role: 'Admin', status: 'Active', added: '2023-01-01' }
-      ];
-
       // Retrieve local storage custom users
       const localUsers = JSON.parse(localStorage.getItem('nurseprep_custom_users') || '[]');
 
       // Combine into unified map keyed by email
       const userMap = new Map<string, any>();
-      defaultUsers.forEach(u => userMap.set(u.email.toLowerCase(), u));
       userList.forEach(u => u.email && userMap.set(u.email.toLowerCase(), u));
       localUsers.forEach((u: any) => u.email && userMap.set(u.email.toLowerCase(), u));
 

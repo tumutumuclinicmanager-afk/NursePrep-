@@ -67,7 +67,6 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
         { name: 'User Management', icon: GraduationCap, path: '/admin/users' },
         { name: 'Payments', icon: FileText, path: '/admin/payments' },
         { name: 'System Analytics', icon: BarChart3, path: '/admin/analytics' },
-        { name: 'Cloud Scalability', icon: Server, path: '/admin/scalability' },
       ];
     }
     if (userRole === 'staff') {

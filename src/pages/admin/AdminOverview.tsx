@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, GraduationCap, Brain, Stethoscope, FileText, Activity, Edit3, Upload, Database, CheckCircle2, Award, BarChart3, Server } from 'lucide-react';
+import { Users, GraduationCap, Brain, Stethoscope, FileText, Activity, Edit3, Upload, Database, CheckCircle2, Award, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -25,8 +25,7 @@ export default function AdminOverview() {
           console.warn("Error fetching users for admin overview:", e);
         }
         const localUsers = JSON.parse(localStorage.getItem('nurseprep_custom_users') || '[]');
-        // Include default admins + local custom users
-        setUserCount(Math.max(totalUsers + localUsers.length, 2 + localUsers.length));
+        setUserCount(totalUsers + localUsers.length);
 
         // 2. Fetch Questions
         try {
@@ -78,12 +77,6 @@ export default function AdminOverview() {
           <p className="text-slate-500 text-sm">Real-time system statistics, live question counts, and question bank controls.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link 
-            to="/admin/scalability"
-            className="bg-indigo-900 hover:bg-indigo-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-xs transition-colors"
-          >
-            <Server className="w-4 h-4 text-indigo-300" /> Cloud Scalability
-          </Link>
           <Link 
             to="/admin/analytics"
             className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-xs transition-colors"
