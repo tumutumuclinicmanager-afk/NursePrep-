@@ -3,7 +3,6 @@ import { BrainCircuit, Send, RefreshCw, Copy, Check, BookOpen, Lightbulb, HelpCi
 import { NURSING_UNITS } from '@/data/quizQuestions';
 import { sanitizeInput } from '@/lib/security';
 import { parseRateLimitResponse } from '@/lib/rateLimit';
-import { GoogleGenAI } from '@google/genai';
 
 interface Message {
   id: string;
@@ -69,24 +68,7 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
   }, [messages, isLoading]);
 
   const generateFallbackAIResponse = async (prompt: string, unit: string, mode: string): Promise<string> => {
-    // 1. Try Client-side Gemini SDK if key is configured
-    const clientKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
-    if (clientKey) {
-      try {
-        const ai = new GoogleGenAI({ apiKey: clientKey });
-        const systemInstruction = `You are NursePrep AI, an expert NCLEX-RN study tutor and clinical judgment mentor. Provide concise, highly structured Saunders-standard NCLEX nursing guidance. Domain focus: ${unit}. Mode: ${mode}.`;
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: prompt,
-          config: { systemInstruction, temperature: 0.7 }
-        });
-        if (response.text) return response.text;
-      } catch (err) {
-        console.warn('Client-side Gemini call failed:', err);
-      }
-    }
-
-    // 2. High-Yield Saunders NCLEX Clinical Mentor Knowledge Base Fallback
+    // High-Yield Saunders NCLEX Clinical Mentor Knowledge Base Fallback
     const queryLower = prompt.toLowerCase();
 
     if (queryLower.includes('toddler') || queryLower.includes('milestone')) {

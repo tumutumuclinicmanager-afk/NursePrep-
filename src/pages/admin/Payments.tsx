@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DollarSign, Search, CheckCircle, Send, XCircle, AlertCircle, CreditCard, Smartphone, ShieldCheck, Key, Settings, Save } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { collection, query, onSnapshot, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 
 export default function Payments() {
   const [payments, setPayments] = useState<any[]>([]);
@@ -25,6 +25,9 @@ export default function Payments() {
         data.push({ id: doc.id, ...doc.data() });
       });
       setPayments(data);
+    }, (err) => {
+      console.error('Error fetching payments snapshot:', err);
+      handleFirestoreError(err, OperationType.LIST, 'payments');
     });
 
     // Load saved payment settings
@@ -41,6 +44,7 @@ export default function Payments() {
         }
       } catch (err) {
         console.error('Error loading payment settings:', err);
+        // Fallback default values are maintained gracefully
       }
     };
     loadSettings();

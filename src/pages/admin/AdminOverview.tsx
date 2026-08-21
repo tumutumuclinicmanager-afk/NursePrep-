@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, GraduationCap, Brain, Stethoscope, FileText, Activity, Edit3, Upload, Database, CheckCircle2, Award } from 'lucide-react';
+import { Users, GraduationCap, Brain, Stethoscope, FileText, Activity, Edit3, Upload, Database, CheckCircle2, Award, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -57,9 +57,9 @@ export default function AdminOverview() {
   }, []);
 
   const stats = [
-    { title: 'Registered Users', value: loading ? '...' : userCount.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { title: 'Questions in Bank', value: loading ? '...' : questionCount.toString(), icon: Database, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Payments Verified', value: loading ? '...' : paymentCount.toString(), icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50' }
+    { title: 'Registered Users', value: loading ? '...' : userCount.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', path: '/admin/users' },
+    { title: 'Questions in Bank', value: loading ? '...' : questionCount.toString(), icon: Database, color: 'text-emerald-600', bg: 'bg-emerald-50', path: '/admin/questions' },
+    { title: 'Payments & Revenue', value: loading ? '...' : paymentCount.toString(), icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50', path: '/admin/analytics' }
   ];
 
   // Group real questions by exam mode or category
@@ -77,12 +77,20 @@ export default function AdminOverview() {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Super Admin Overview</h2>
           <p className="text-slate-500 text-sm">Real-time system statistics, live question counts, and question bank controls.</p>
         </div>
-        <Link 
-          to="/admin/questions"
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-xs transition-colors"
-        >
-          <Edit3 className="w-4 h-4" /> Open Question Bank & Creator
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link 
+            to="/admin/analytics"
+            className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-xs transition-colors"
+          >
+            <BarChart3 className="w-4 h-4 text-blue-400" /> System Analytics
+          </Link>
+          <Link 
+            to="/admin/questions"
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-xs transition-colors"
+          >
+            <Edit3 className="w-4 h-4" /> Open Question Bank
+          </Link>
+        </div>
       </div>
 
       {/* Super Admin Quick Controls Card */}
@@ -156,15 +164,19 @@ export default function AdminOverview() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat, i) => (
-          <div key={i} className="bg-white p-5 rounded-xl border border-slate-200 flex items-center gap-4 shadow-sm">
-            <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+          <Link 
+            key={i} 
+            to={stat.path}
+            className="bg-white p-5 rounded-xl border border-slate-200 flex items-center gap-4 shadow-sm hover:border-blue-300 hover:shadow-md transition-all group"
+          >
+            <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform`}>
               <stat.icon className="w-6 h-6" />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{stat.title}</p>
               <p className="text-2xl font-bold text-slate-900 leading-none mt-1">{stat.value}</p>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 

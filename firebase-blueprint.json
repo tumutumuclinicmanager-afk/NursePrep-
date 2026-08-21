@@ -105,6 +105,38 @@
         "enabled": { "type": "boolean", "description": "Active state" }
       },
       "required": ["name", "conditionType", "conditionValue"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "System or merchant payment configuration",
+      "type": "object",
+      "properties": {
+        "stripeAccountEmail": { "type": "string", "description": "Stripe account email" },
+        "stripeLiveKey": { "type": "string", "description": "Stripe publishable/live key" },
+        "mpesaTillNumber": { "type": "string", "description": "M-Pesa till/paybill number" },
+        "mpesaBusinessName": { "type": "string", "description": "Business or merchant name" },
+        "payoutBank": { "type": "string", "description": "Payout bank account identifier" },
+        "updatedAt": { "type": "string", "description": "ISO update timestamp" }
+      }
+    },
+    "ExamMode": {
+      "title": "ExamMode",
+      "description": "Exam classification mode",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Mode name" },
+        "code": { "type": "string", "description": "Unique mode code identifier" }
+      },
+      "required": ["name"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Subject or domain taxonomy category",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Category name" }
+      },
+      "required": ["name"]
     }
   },
   "firestore": {
@@ -139,6 +171,18 @@
     "/badgeConfigs/{badgeId}": {
       "schema": { "$ref": "#/entities/BadgeConfig" },
       "description": "Configurable badge gamification rules"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Setting" },
+      "description": "System and payment gateway configurations"
+    },
+    "/exam_modes/{modeId}": {
+      "schema": { "$ref": "#/entities/ExamMode" },
+      "description": "Exam modes taxonomy"
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Subject domain taxonomy"
     }
   }
 }

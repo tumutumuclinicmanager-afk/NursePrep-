@@ -78,6 +78,20 @@ service cloud.firestore {
     match /badgeConfigs/{badgeId} {
       allow read, write: if true;
     }
+
+    // System Settings (Payment gateways, general configurations)
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Exam taxonomy, modes, and subject categories
+    match /exam_modes/{modeId} {
+      allow read, write: if true;
+    }
+
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
     
     // Default fallback deny rule
     match /{document=**} {

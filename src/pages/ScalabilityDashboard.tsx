@@ -3,7 +3,9 @@ import {
   Server, Cpu, ShieldAlert, Database, HardDrive, 
   Layers, Globe, Activity, CheckCircle2, RefreshCw, 
   Zap, ArrowRight, Lock, Radio, CpuIcon, CloudLightning,
-  Clock, ShieldCheck, AlertTriangle, Play
+  Clock, ShieldCheck, AlertTriangle, Play, Sliders,
+  Save, RotateCcw, Sparkles, Check, ChevronRight,
+  Shield, Key, Flame
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -14,6 +16,18 @@ interface RateTestLog {
   message: string;
   remaining?: string | number;
   retryAfter?: number;
+}
+
+interface RatePolicy {
+  id: string;
+  name: string;
+  category: string;
+  scope: string;
+  max: number;
+  windowMinutes: number;
+  enabled: boolean;
+  limit?: string;
+  description: string;
 }
 
 export default function ScalabilityDashboard() {
@@ -29,34 +43,34 @@ export default function ScalabilityDashboard() {
   const [rateLimitEnabled, setRateLimitEnabled] = useState<boolean>(true);
   const [blockedRequests, setBlockedRequests] = useState<number>(128);
 
-  // Live Rate Limiter Test Lab State
+  // Live Rate Limiter Test Lab & Policy Manager State
   const [liveTestLogs, setLiveTestLogs] = useState<RateTestLog[]>([]);
   const [isTestingRateLimit, setIsTestingRateLimit] = useState<boolean>(false);
-  const [activePolicies, setActivePolicies] = useState<any[]>([]);
+  const [policies, setPolicies] = useState<RatePolicy[]>([]);
+  const [isSavingPolicies, setIsSavingPolicies] = useState<boolean>(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('');
   const [rateLimitCooldownSec, setRateLimitCooldownSec] = useState<number>(0);
+  const [activePreset, setActivePreset] = useState<string>('balanced');
 
   const [queueJobs, setQueueJobs] = useState<number>(42);
   const [processingQueue, setProcessingQueue] = useState<boolean>(false);
 
   const [cdnRegion, setCdnRegion] = useState<string>('Global Edge (Cloudflare)');
 
+  const fetchPolicies = async () => {
+    try {
+      const res = await fetch('/api/rate-limit-status');
+      const data = await res.json();
+      if (data.policies && Array.isArray(data.policies)) {
+        setPolicies(data.policies);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch rate limit policies:", e);
+    }
+  };
+
   useEffect(() => {
-    // Fetch live rate limiter policies from server
-    fetch('/api/rate-limit-status')
-      .then(res => res.json())
-      .then(data => {
-        if (data.policies) setActivePolicies(data.policies);
-      })
-      .catch(() => {
-        // Fallback default policies
-        setActivePolicies([
-          { name: "General API", limit: "100 req / 15 min", scope: "/api/*" },
-          { name: "AI Study Mentor & Quiz", limit: "25 req / 10 min", scope: "/api/study-assistant, /api/generate-quiz" },
-          { name: "Exam PDF Extraction", limit: "10 uploads / 15 min", scope: "/api/upload-exam" },
-          { name: "M-Pesa STK Payment", limit: "5 pushes / 10 min", scope: "/api/payment/stkpush" },
-          { name: "Demo Test Endpoint", limit: "5 req / 1 min", scope: "/api/test-rate-limit" }
-        ]);
-      });
+    fetchPolicies();
   }, []);
 
   // Cooldown countdown
@@ -67,6 +81,93 @@ export default function ScalabilityDashboard() {
     }, 1000);
     return () => clearInterval(interval);
   }, [rateLimitCooldownSec]);
+
+  const handlePolicyChange = (id: string, field: 'max' | 'windowMinutes' | 'enabled', value: any) => {
+    setPolicies(prev => prev.map(p => {
+      if (p.id === id) {
+        const updated = { ...p, [field]: value };
+        updated.limit = updated.enabled ? `${updated.max} req / ${updated.windowMinutes} min` : 'Disabled (Bypassed)';
+        return updated;
+      }
+      return p;
+    }));
+  };
+
+  const handleApplyPreset = (presetKey: 'strict' | 'balanced' | 'surge') => {
+    setActivePreset(presetKey);
+    if (presetKey === 'strict') {
+      setPolicies(prev => prev.map(p => {
+        if (p.id === 'general') return { ...p, max: 40, windowMinutes: 15, enabled: true };
+        if (p.id === 'ai') return { ...p, max: 10, windowMinutes: 10, enabled: true };
+        if (p.id === 'upload') return { ...p, max: 3, windowMinutes: 15, enabled: true };
+        if (p.id === 'payment') return { ...p, max: 3, windowMinutes: 10, enabled: true };
+        if (p.id === 'test') return { ...p, max: 2, windowMinutes: 1, enabled: true };
+        return p;
+      }));
+    } else if (presetKey === 'surge') {
+      setPolicies(prev => prev.map(p => {
+        if (p.id === 'general') return { ...p, max: 300, windowMinutes: 15, enabled: true };
+        if (p.id === 'ai') return { ...p, max: 75, windowMinutes: 10, enabled: true };
+        if (p.id === 'upload') return { ...p, max: 30, windowMinutes: 15, enabled: true };
+        if (p.id === 'payment') return { ...p, max: 15, windowMinutes: 10, enabled: true };
+        if (p.id === 'test') return { ...p, max: 15, windowMinutes: 1, enabled: true };
+        return p;
+      }));
+    } else {
+      // Balanced
+      setPolicies(prev => prev.map(p => {
+        if (p.id === 'general') return { ...p, max: 100, windowMinutes: 15, enabled: true };
+        if (p.id === 'ai') return { ...p, max: 25, windowMinutes: 10, enabled: true };
+        if (p.id === 'upload') return { ...p, max: 10, windowMinutes: 15, enabled: true };
+        if (p.id === 'payment') return { ...p, max: 5, windowMinutes: 10, enabled: true };
+        if (p.id === 'test') return { ...p, max: 5, windowMinutes: 1, enabled: true };
+        return p;
+      }));
+    }
+  };
+
+  const handleSavePoliciesToServer = async () => {
+    setIsSavingPolicies(true);
+    setSaveSuccessMsg('');
+    try {
+      const res = await fetch('/api/admin/rate-limit-policies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ policies })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSaveSuccessMsg('Active rate limiting policies updated and enforced across all API routes!');
+        if (data.policies) setPolicies(data.policies);
+        setTimeout(() => setSaveSuccessMsg(''), 4000);
+      } else {
+        alert(data.error || 'Failed to save policies');
+      }
+    } catch (e: any) {
+      alert('Error updating rate limits on server');
+    } finally {
+      setIsSavingPolicies(false);
+    }
+  };
+
+  const handleResetDefaults = async () => {
+    if (!confirm("Are you sure you want to restore all rate limit quotas to system defaults?")) return;
+    setIsSavingPolicies(true);
+    try {
+      const res = await fetch('/api/admin/rate-limit-reset', { method: 'POST' });
+      const data = await res.json();
+      if (data.policies) {
+        setPolicies(data.policies);
+        setActivePreset('balanced');
+        setSaveSuccessMsg('Restored system default rate limit rules.');
+        setTimeout(() => setSaveSuccessMsg(''), 3000);
+      }
+    } catch (e) {
+      alert("Failed to reset rate limit defaults");
+    } finally {
+      setIsSavingPolicies(false);
+    }
+  };
 
   const handleTestRateLimitRequest = async () => {
     setIsTestingRateLimit(true);
@@ -84,7 +185,7 @@ export default function ScalabilityDashboard() {
             id: `log-${Date.now()}`,
             time: now,
             status: 429,
-            message: data.error || '429 Rate Limit Exceeded (5 req/min exceeded)',
+            message: data.error || '429 Rate Limit Exceeded: Quota reached for category',
             remaining: 0,
             retryAfter: retry
           },
@@ -96,7 +197,7 @@ export default function ScalabilityDashboard() {
             id: `log-${Date.now()}`,
             time: now,
             status: 200,
-            message: data.message || '200 OK: Request allowed within rate quota',
+            message: data.message || '200 OK: Probe accepted within configured category quota',
             remaining: data.quotaRemaining ?? 'Allowed'
           },
           ...prev.slice(0, 7)
@@ -108,21 +209,13 @@ export default function ScalabilityDashboard() {
           id: `log-${Date.now()}`,
           time: now,
           status: 500,
-          message: err?.message || 'Network error executing rate limit probe'
+          message: err?.message || 'Network error probe execution'
         },
         ...prev.slice(0, 7)
       ]);
     } finally {
       setIsTestingRateLimit(false);
     }
-  };
-
-  const handleSimulateQueue = () => {
-    setProcessingQueue(true);
-    setTimeout(() => {
-      setQueueJobs(0);
-      setProcessingQueue(false);
-    }, 1500);
   };
 
   const handleAddLoad = () => {
@@ -133,30 +226,6 @@ export default function ScalabilityDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-fadeIn">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-600/20 via-transparent to-transparent pointer-events-none"></div>
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-medium mb-4">
-            <Radio className="w-3.5 h-3.5 animate-pulse text-blue-400" /> Enterprise Architecture & Scalability Standard
-          </div>
-          <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight">
-            10 Problems Every Scalable App Must Solve
-          </h1>
-          <p className="text-slate-300 mt-2 max-w-2xl text-sm leading-relaxed">
-            Inspired by high-availability systems engineering principles, this interactive dashboard maps how NursePrep AI handles peak traffic, caching layers, rate limiting, object storage, background message queues, and global CDN latency.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button onClick={handleAddLoad} className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-lg shadow-blue-600/35 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-300" /> Simulate High Traffic Spike (+1,200 req/s)
-            </Button>
-            <Button onClick={() => { setLbRequests(4500); setCacheHits(14280); setBlockedRequests(128); setQueueJobs(42); }} variant="outline" className="border-slate-700 bg-slate-900/60 text-slate-200 hover:bg-slate-800 text-xs font-semibold px-4 py-2 rounded-xl">
-              <RefreshCw className="w-3.5 h-3.5" /> Reset Telemetry
-            </Button>
-          </div>
-        </div>
-      </div>
-
       {/* Live Metrics Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
@@ -192,7 +261,7 @@ export default function ScalabilityDashboard() {
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Rate Limiter</p>
             <h3 className="text-2xl font-bold text-slate-900 mt-1">{blockedRequests} Blocked</h3>
             <span className="text-xs text-indigo-600 font-medium flex items-center gap-1 mt-1">
-              <ShieldAlert className="w-3.5 h-3.5" /> API Gateway Active
+              <ShieldAlert className="w-3.5 h-3.5" /> Dynamic Rules Enforced
             </span>
           </div>
           <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
@@ -214,186 +283,208 @@ export default function ScalabilityDashboard() {
         </div>
       </div>
 
-      {/* Interactive Simulation Interactive Panels */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Panel 1: Load Balancer & Traffic */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-bold">1</div>
-              <div>
-                <h3 className="font-bold text-slate-900">High Traffic → Load Balancer</h3>
-                <p className="text-xs text-slate-500">Nginx & AWS ALB Traffic Distribution</p>
-              </div>
-            </div>
-            <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-medium">Active</span>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-600">Active Compute Nodes:</span>
-              <div className="flex gap-2">
-                {[2, 3, 5, 8].map(n => (
-                  <button 
-                    key={n}
-                    onClick={() => setLbActiveNodes(n)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${lbActiveNodes === n ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                  >
-                    {n} Nodes
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-600">Balancing Algorithm:</span>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setLbAlgorithm('round-robin')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold ${lbAlgorithm === 'round-robin' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}
-                >
-                  Round-Robin
-                </button>
-                <button 
-                  onClick={() => setLbAlgorithm('least-conn')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold ${lbAlgorithm === 'least-conn' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}
-                >
-                  Least-Connections
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/60 text-xs space-y-2">
-              <div className="flex justify-between text-slate-700 font-medium">
-                <span>Load Per Node ({lbActiveNodes} active instances):</span>
-                <span>{Math.round(lbRequests / lbActiveNodes).toLocaleString()} req/s per node</span>
-              </div>
-              <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full transition-all duration-500 ${Math.round(lbRequests / lbActiveNodes) > 2000 ? 'bg-amber-500' : 'bg-blue-600'}`}
-                  style={{ width: `${Math.min(100, (lbRequests / (lbActiveNodes * 1500)) * 100)}%` }}
-                ></div>
-              </div>
-              <p className="text-slate-500 text-[11px]">
-                {lbAlgorithm === 'round-robin' ? 'Distributing incoming requests sequentially across all healthy targets.' : 'Routing traffic to the server with fewest active TCP connections.'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Panel 2: Slow Database & Caching */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 font-bold">2</div>
-              <div>
-                <h3 className="font-bold text-slate-900">Slow Database → Cache (Redis)</h3>
-                <p className="text-xs text-slate-500">In-Memory Key-Value Caching Layer</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => setCacheEnabled(!cacheEnabled)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${cacheEnabled ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}
-            >
-              {cacheEnabled ? 'Cache Enabled' : 'Cache Bypassed'}
-            </button>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
-                <p className="text-xs text-slate-500">Cache Hits</p>
-                <p className="text-xl font-bold text-emerald-600 mt-1">{cacheHits.toLocaleString()}</p>
-                <span className="text-[10px] text-slate-400">Response time: ~2ms</span>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
-                <p className="text-xs text-slate-500">DB Queries</p>
-                <p className="text-xl font-bold text-amber-600 mt-1">{cacheMisses.toLocaleString()}</p>
-                <span className="text-[10px] text-slate-400">Response time: ~145ms</span>
-              </div>
-            </div>
-
-            <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100 text-xs text-blue-900 flex items-center justify-between">
-              <div>
-                <span className="font-semibold block">Database Load Reduction</span>
-                <span>Queries saved: {cacheEnabled ? '97.8%' : '0% (Direct DB hammering)'}</span>
-              </div>
-              <Database className="w-8 h-8 text-blue-500 opacity-60" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Live Interactive Rate Limiting Engine Section */}
+      {/* SUPER ADMIN DYNAMIC RATE LIMITING POLICY CONFIGURATOR */}
       <div className="bg-white rounded-3xl p-6 lg:p-8 border border-slate-200/90 shadow-sm space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+          <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-bold">
-              <ShieldAlert className="w-6 h-6" />
+              <Sliders className="w-6 h-6" />
             </div>
             <div>
-              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] font-semibold mb-1">
-                <ShieldCheck className="w-3 h-3" /> Rate Limiting & Token-Bucket Gateway
+              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] font-bold mb-1">
+                <ShieldCheck className="w-3 h-3 text-indigo-600" /> Super Admin Active Policy Engine
               </div>
-              <h2 className="text-xl font-bold text-slate-900">Live API Rate Limiting Tester & Policy Monitor</h2>
+              <h2 className="text-xl lg:text-2xl font-black text-slate-900 tracking-tight">Active Rate Limiting Policies & Category Quotas</h2>
               <p className="text-xs text-slate-500">
-                Test real-time Express rate limiters with sliding windows, automatic 429 responses, and client retry countdowns.
+                Adjust the number of allowed HTTP requests and sliding time windows for each functional category in real-time.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Presets */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+              <button
+                onClick={() => handleApplyPreset('strict')}
+                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-all ${
+                  activePreset === 'strict' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Shield className="w-3 h-3 text-rose-500" /> Strict Defense
+              </button>
+              <button
+                onClick={() => handleApplyPreset('balanced')}
+                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-all ${
+                  activePreset === 'balanced' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Sparkles className="w-3 h-3 text-blue-500" /> Balanced (Rec)
+              </button>
+              <button
+                onClick={() => handleApplyPreset('surge')}
+                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-all ${
+                  activePreset === 'surge' ? 'bg-white text-amber-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Flame className="w-3 h-3 text-amber-500" /> High Surge
+              </button>
+            </div>
+
             <Button
-              onClick={handleTestRateLimitRequest}
-              disabled={isTestingRateLimit || rateLimitCooldownSec > 0}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-2 shadow-md shadow-indigo-600/20"
+              onClick={handleResetDefaults}
+              variant="outline"
+              className="text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1.5 border-slate-200 hover:bg-slate-50 text-slate-600"
             >
-              {rateLimitCooldownSec > 0 ? (
-                <>
-                  <Clock className="w-3.5 h-3.5 animate-spin" /> Cooldown Active ({rateLimitCooldownSec}s)
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5" /> Send Test Probe (Limit: 5/min)
-                </>
-              )}
+              <RotateCcw className="w-3.5 h-3.5" /> Defaults
+            </Button>
+
+            <Button
+              onClick={handleSavePoliciesToServer}
+              disabled={isSavingPolicies}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {isSavingPolicies ? 'Applying to Express...' : 'Save & Enforce Policies'}
             </Button>
           </div>
         </div>
 
-        {/* Policies Grid & Live Probe Logs */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Active Policies List */}
-          <div className="lg:col-span-5 space-y-3">
-            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Rate Limiting Policies</h3>
-            <div className="space-y-2.5">
-              {activePolicies.map((pol, idx) => (
-                <div key={idx} className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl text-xs flex items-center justify-between">
+        {saveSuccessMsg && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold rounded-2xl flex items-center gap-2 animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            {saveSuccessMsg}
+          </div>
+        )}
+
+        {/* Dynamic Policy Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {policies.map((policy) => (
+            <div 
+              key={policy.id}
+              className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+                policy.enabled 
+                  ? 'bg-slate-50/70 border-slate-200/90 shadow-xs' 
+                  : 'bg-slate-100/60 border-slate-200 opacity-60'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-black uppercase tracking-wider">
+                    {policy.category}
+                  </span>
+                  
+                  {/* Status Toggle Switch */}
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold">
+                    <input
+                      type="checkbox"
+                      checked={policy.enabled}
+                      onChange={(e) => handlePolicyChange(policy.id, 'enabled', e.target.checked)}
+                      className="sr-only"
+                    />
+                    <span className={`w-8 h-4.5 flex items-center rounded-full p-0.5 transition-colors ${policy.enabled ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                      <span className={`bg-white w-3.5 h-3.5 rounded-full shadow-xs transform transition-transform ${policy.enabled ? 'translate-x-3.5' : 'translate-x-0'}`}></span>
+                    </span>
+                    <span className="text-[11px] text-slate-500">{policy.enabled ? 'Active' : 'Bypassed'}</span>
+                  </label>
+                </div>
+
+                <h3 className="font-extrabold text-slate-900 text-sm">{policy.name}</h3>
+                <p className="text-slate-500 text-[11px] mt-0.5 font-mono">{policy.scope}</p>
+                <p className="text-slate-600 text-xs mt-2 leading-relaxed">{policy.description}</p>
+              </div>
+
+              {/* Adjustable Controls */}
+              <div className="mt-4 pt-3 border-t border-slate-200/70 space-y-3">
+                <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="font-semibold text-slate-900 block">{pol.name}</span>
-                    <span className="text-[11px] text-slate-500 font-mono">{pol.scope}</span>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Max Requests
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        max="5000"
+                        value={policy.max}
+                        onChange={(e) => handlePolicyChange(policy.id, 'max', parseInt(e.target.value) || 1)}
+                        className="w-full pl-2.5 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                      />
+                      <span className="text-[10px] text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2">req</span>
+                    </div>
                   </div>
-                  <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200/60 rounded-lg text-[11px] font-semibold">
-                    {pol.limit}
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Window (Mins)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        max="1440"
+                        value={policy.windowMinutes}
+                        onChange={(e) => handlePolicyChange(policy.id, 'windowMinutes', parseInt(e.target.value) || 1)}
+                        className="w-full pl-2.5 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                      />
+                      <span className="text-[10px] text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2">min</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] pt-1 text-slate-500">
+                  <span>Enforced Rule:</span>
+                  <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
+                    {policy.enabled ? `${policy.max} req / ${policy.windowMinutes} min` : 'Unrestricted'}
                   </span>
                 </div>
-              ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Live Probe Sandbox & 429 Test Console */}
+        <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Key className="w-4 h-4 text-indigo-600" />
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Live Sandbox Probe Tester</h3>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Verify your active rate limiter in real time. Sending rapid probes will test the configured limits and trigger instant <strong>HTTP 429 Too Many Requests</strong> responses once your quota is reached.
+            </p>
+
+            <div className="pt-2">
+              <Button
+                onClick={handleTestRateLimitRequest}
+                disabled={isTestingRateLimit || rateLimitCooldownSec > 0}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors"
+              >
+                {rateLimitCooldownSec > 0 ? (
+                  <>
+                    <Clock className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                    <span>Rate Limited Cooldown Active ({rateLimitCooldownSec}s)</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Send Test Probe against Endpoint</span>
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
-          {/* Real-time Probe Results Console */}
-          <div className="lg:col-span-7 space-y-3">
+          <div className="lg:col-span-7 space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Live Probe Telemetry & 429 Simulator</h3>
-              <span className="text-[11px] text-slate-400">Endpoint: <code className="text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">/api/test-rate-limit</code></span>
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Probe Execution Telemetry Log</span>
+              <span className="text-[11px] text-slate-400 font-mono">/api/test-rate-limit</span>
             </div>
 
-            <div className="bg-slate-950 text-slate-200 rounded-2xl p-4 font-mono text-xs space-y-2 min-h-[190px] border border-slate-800 flex flex-col justify-start">
+            <div className="bg-slate-950 text-slate-200 rounded-2xl p-4 font-mono text-xs space-y-2 min-h-[160px] border border-slate-800 flex flex-col justify-start">
               {liveTestLogs.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center py-8">
-                  <Activity className="w-6 h-6 mb-2 text-slate-600 animate-pulse" />
-                  <p>Click "Send Test Probe" to fire live requests against the rate limiter.</p>
-                  <p className="text-[10px] text-slate-600 mt-1">Exceeding 5 requests within 1 minute will trigger an HTTP 429 Too Many Requests response.</p>
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center py-6">
+                  <Activity className="w-5 h-5 mb-1.5 text-slate-600 animate-pulse" />
+                  <p>Click "Send Test Probe" to fire live requests against the active rate limiter.</p>
                 </div>
               ) : (
                 liveTestLogs.map(log => (
@@ -415,167 +506,6 @@ export default function ScalabilityDashboard() {
               )}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* The 10 Scalability Pillars Grid */}
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 mb-6">The 10 Scalability Pillars & Implementation in NursePrep AI</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          
-          {/* 1 */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold mb-4">1</div>
-              <h3 className="font-bold text-slate-900 text-base">High Traffic → Load Balancer</h3>
-              <p className="text-xs text-slate-500 mt-1">Nginx & AWS ALB</p>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                Distributes incoming student HTTP and WebSocket requests across multiple container replicas to ensure zero single points of failure.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Configured & Active in Cloud Run Ingress
-            </div>
-          </div>
-
-          {/* 2 */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-bold mb-4">2</div>
-              <h3 className="font-bold text-slate-900 text-base">Slow Database → Cache</h3>
-              <p className="text-xs text-slate-500 mt-1">Redis / Memcached</p>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                Caches frequently accessed NCLEX question banks, rationales, and user session profiles in memory to bypass repetitive Firestore reads.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> 98% Cache Hit Efficiency
-            </div>
-          </div>
-
-          {/* 3 */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold mb-4">3</div>
-              <h3 className="font-bold text-slate-900 text-base">API Abuse → Rate Limiting</h3>
-              <p className="text-xs text-slate-500 mt-1">API Gateway Token Bucket</p>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                Protects AI quiz generation and exam submission endpoints against bot scrapers and DDoS attacks using IP-based sliding window rate limits.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> 100 req/min limit per user token
-            </div>
-          </div>
-
-          {/* 4 */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center font-bold mb-4">4</div>
-              <h3 className="font-bold text-slate-900 text-base">Large File Storage → Object Storage</h3>
-              <p className="text-xs text-slate-500 mt-1">AWS S3 / Google Cloud Storage</p>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                Offloads heavy medical diagrams, student exam PDF uploads, and video lectures from application servers into secure scalable object buckets.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Signed URLs for Secure Access
-            </div>
-          </div>
-
-          {/* 5 */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center font-bold mb-4">5</div>
-              <h3 className="font-bold text-slate-900 text-base">Slow Background Tasks → Queue</h3>
-              <p className="text-xs text-slate-500 mt-1">Kafka / RabbitMQ / Cloud Tasks</p>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                Queues heavy computational jobs like AI exam grading, analytics report generation, and bulk email notifications for asynchronous worker processing.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">{queueJobs} jobs pending</span>
-              <button onClick={handleSimulateQueue} disabled={processingQueue} className="text-xs bg-purple-600 hover:bg-purple-500 text-white font-medium px-3 py-1 rounded-lg">
-                {processingQueue ? 'Processing...' : 'Run Workers'}
-              </button>
-            </div>
-          </div>
-
-          {/* 6 */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center font-bold mb-4">6</div>
-              <h3 className="font-bold text-slate-900 text-base">Global Latency → CDN</h3>
-              <p className="text-xs text-slate-500 mt-1">CloudFront / Cloudflare Edge</p>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                Caches static assets (JS bundles, CSS, nursing illustrations) at 275+ edge locations worldwide to reduce latency for nursing students globally.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-              <Globe className="w-3.5 h-3.5" /> Edge Cache TTL: 24 Hours
-            </div>
-          </div>
-
-          {/* 7 */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center font-bold mb-4">7</div>
-              <h3 className="font-bold text-slate-900 text-base">Microservices & Mesh</h3>
-              <p className="text-xs text-slate-500 mt-1">Istio / Envoy Service Mesh</p>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                Secures inter-service communications with mutual TLS (mTLS), automated retries, and distributed tracing across auth, quiz, and AI services.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> mTLS Encryption Enabled
-            </div>
-          </div>
-
-          {/* 8 */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center font-bold mb-4">8</div>
-              <h3 className="font-bold text-slate-900 text-base">Distributed Tracing & Logging</h3>
-              <p className="text-xs text-slate-500 mt-1">OpenTelemetry & Datadog</p>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                Tracks every student request across database queries and Gemini AI model calls with unique correlation IDs for instantaneous bottleneck debugging.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Real-time APM Monitoring
-            </div>
-          </div>
-
-          {/* 9 */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center font-bold mb-4">9</div>
-              <h3 className="font-bold text-slate-900 text-base">Database Sharding & Replication</h3>
-              <p className="text-xs text-slate-500 mt-1">Multi-Region Read Replicas</p>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                Splits heavy read traffic from write traffic using distributed read replicas, ensuring lightning-fast quiz retrieval during nationwide mock exams.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Sub-10ms Read Latency
-            </div>
-          </div>
-
-          {/* 10 */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between md:col-span-2 lg:col-span-1">
-            <div>
-              <div className="w-10 h-10 bg-violet-50 text-violet-600 rounded-xl flex items-center justify-center font-bold mb-4">10</div>
-              <h3 className="font-bold text-slate-900 text-base">Fault Tolerance & Circuit Breakers</h3>
-              <p className="text-xs text-slate-500 mt-1">Resilience4j / Fallbacks</p>
-              <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                Gracefully degrades non-essential features (e.g., fallback static questions if AI generation service times out) to keep the core exam engine running.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Automatic Failover Active
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
