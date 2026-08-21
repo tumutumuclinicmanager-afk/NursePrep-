@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrainCircuit, Send, RefreshCw, Copy, Check, BookOpen, Lightbulb, HelpCircle, Layers, Maximize2, Minimize2, AlertCircle } from 'lucide-react';
+import { BrainCircuit, Send, RefreshCw, Copy, Check, BookOpen, Lightbulb, HelpCircle, Layers, Maximize2, Minimize2, AlertCircle, Clock, ShieldAlert } from 'lucide-react';
 import { NURSING_UNITS } from '@/data/quizQuestions';
 import { sanitizeInput } from '@/lib/security';
+import { parseRateLimitResponse } from '@/lib/rateLimit';
 import { GoogleGenAI } from '@google/genai';
 
 interface Message {
@@ -40,8 +41,24 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
   const [isLoading, setIsLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [rateLimitCooldown, setRateLimitCooldown] = useState<number>(0);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Active Rate Limit Countdown Timer
+  useEffect(() => {
+    if (rateLimitCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setRateLimitCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [rateLimitCooldown]);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -158,6 +175,11 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
   };
 
   const handleSendMessage = async (textToSend?: string) => {
+    if (rateLimitCooldown > 0) {
+      setErrorText(`Rate limit active. Please wait ${rateLimitCooldown}s before asking another question.`);
+      return;
+    }
+
     const rawText = textToSend || inputMessage;
     const cleanPrompt = sanitizeInput(rawText);
 
@@ -196,7 +218,12 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
         })
       });
 
-      if (res.ok) {
+      if (res.status === 429) {
+        const rateInfo = await parseRateLimitResponse(res);
+        setRateLimitCooldown(rateInfo.retryAfterSeconds || 60);
+        setErrorText(rateInfo.message || `Rate limit reached (25 req / 10 min). Next request available in ${rateInfo.retryAfterSeconds}s.`);
+        replyText = `⚠️ **AI Rate Limit Quota Reached**: You have reached the maximum allowed AI tutor questions for this 10-minute window (25 requests per 10 minutes). Please wait **${rateInfo.retryAfterSeconds} seconds** for the rate limit token bucket to refresh.`;
+      } else if (res.ok) {
         const contentType = res.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
           const data = await res.json();
@@ -205,7 +232,7 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
       }
 
       // If server returned 404 or non-200 (e.g., static hosting site like nurseprep.co.ke), use fallback AI
-      if (!replyText) {
+      if (!replyText && res.status !== 429) {
         console.warn(`API server returned status ${res.status}. Using fallback NCLEX AI mentor.`);
         replyText = await generateFallbackAIResponse(cleanPrompt, selectedUnit, assistantMode);
       }
@@ -436,7 +463,19 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
           </div>
         )}
 
-        {errorText && (
+        {rateLimitCooldown > 0 && (
+          <div className="bg-amber-950/40 border border-amber-600/50 text-amber-300 p-3 rounded-lg text-xs flex items-center justify-between gap-2 animate-pulse">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+              <span><strong>Rate Limit Active:</strong> 25 questions / 10 min window reached.</span>
+            </div>
+            <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 font-mono font-bold rounded text-[11px] shrink-0 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> {rateLimitCooldown}s
+            </span>
+          </div>
+        )}
+
+        {errorText && !rateLimitCooldown && (
           <div className="bg-rose-950/40 border border-rose-800/60 text-rose-300 p-3 rounded-lg text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>{errorText}</span>
@@ -471,20 +510,25 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
+              rateLimitCooldown > 0 ? `Rate limit cooldown active (${rateLimitCooldown}s remaining)...` :
               assistantMode === 'mnemonic' ? "Topic for mnemonic (e.g. Digoxin toxicity symptoms)..." :
               assistantMode === 'flashcards' ? "Flashcard subject (e.g. Pediatric vital signs)..." :
               assistantMode === 'rationale' ? "Paste question stem or topic for rationale..." :
               "Ask NursePrep AI a nursing question..."
             }
-            disabled={isLoading}
+            disabled={isLoading || rateLimitCooldown > 0}
             className="w-full bg-slate-900 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none rounded-lg p-3 pr-10 text-xs text-white placeholder:text-slate-500 disabled:opacity-50"
           />
           <button
             onClick={() => handleSendMessage()}
-            disabled={isLoading || !inputMessage.trim()}
-            className="absolute right-2 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-md transition-colors"
+            disabled={isLoading || !inputMessage.trim() || rateLimitCooldown > 0}
+            className="absolute right-2 p-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-md transition-colors flex items-center gap-1"
           >
-            <Send className="w-3.5 h-3.5" />
+            {rateLimitCooldown > 0 ? (
+              <span className="text-[10px] font-mono font-bold px-1">{rateLimitCooldown}s</span>
+            ) : (
+              <Send className="w-3.5 h-3.5" />
+            )}
           </button>
         </div>
       </div>

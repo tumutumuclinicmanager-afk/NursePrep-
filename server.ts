@@ -28,21 +28,74 @@ async function startServer() {
     })
   );
 
+  // Helper to format consistent Rate Limit 429 JSON response
+  const rateLimitHandler = (customMessage: string) => {
+    return (req: express.Request, res: express.Response, _next: express.NextFunction, _options: any) => {
+      const resetTime = (req as any).rateLimit?.resetTime as Date | undefined;
+      const retryAfterSeconds = resetTime ? Math.max(1, Math.ceil((resetTime.getTime() - Date.now()) / 1000)) : 60;
+      res.setHeader('Retry-After', retryAfterSeconds.toString());
+      res.status(429).json({
+        error: customMessage,
+        status: 429,
+        retryAfterSeconds,
+        limit: (req as any).rateLimit?.limit || null,
+        current: (req as any).rateLimit?.current || null,
+        remaining: 0,
+        resetTime: resetTime ? resetTime.toISOString() : null,
+      });
+    };
+  };
+
   // General API Rate Limiter (Max 100 requests per 15 minutes per IP)
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
-    message: { error: "Too many requests, please try again later." },
+    message: { error: "API rate limit reached (100 req / 15 min). Please try again shortly." },
+    handler: rateLimitHandler("API rate limit reached (100 req / 15 min). Please try again shortly."),
     standardHeaders: true,
     legacyHeaders: false,
     validate: { trustProxy: false, xForwardedForHeader: false },
   });
 
-  // Strict Rate Limiter for AI Generation & Upload Endpoints (Max 30 per 15 mins)
+  // Strict Rate Limiter for AI Generation & Tutor Endpoints (Max 25 requests per 10 mins)
   const aiLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 25,
+    message: { error: "AI generation quota limit reached for this IP window (25 req / 10 min). Please try again shortly." },
+    handler: rateLimitHandler("AI tutor quota exceeded for this session window. Please wait for cooldown before requesting more AI explanations."),
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { trustProxy: false, xForwardedForHeader: false },
+  });
+
+  // Strict Rate Limiter for PDF / Document Uploads (Max 10 per 15 mins)
+  const uploadLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 30,
-    message: { error: "AI generation quota limit reached for this IP window. Please try again shortly." },
+    max: 10,
+    message: { error: "Exam PDF upload limit reached (10 uploads / 15 min). Please wait before uploading more documents." },
+    handler: rateLimitHandler("Exam upload limit reached (10 files / 15 min). Please wait before uploading more exam documents."),
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { trustProxy: false, xForwardedForHeader: false },
+  });
+
+  // Strict Rate Limiter for Payment / STK Push Requests (Max 5 per 10 mins)
+  const paymentLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 5,
+    message: { error: "Payment request limit reached (5 attempts / 10 min). Please wait before initiating another STK push." },
+    handler: rateLimitHandler("Too many payment attempts. For security, please wait 10 minutes before retrying M-Pesa STK push."),
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: { trustProxy: false, xForwardedForHeader: false },
+  });
+
+  // Interactive Demonstration Limiter (Max 5 requests per 1 minute)
+  const testLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000,
+    max: 5,
+    message: { error: "Demo Rate Limit Exceeded (5 test requests / 1 min reached)!" },
+    handler: rateLimitHandler("Demo Rate Limit Triggered: Rate limiter successfully blocked request (5 requests / 1 min exceeded)."),
     standardHeaders: true,
     legacyHeaders: false,
     validate: { trustProxy: false, xForwardedForHeader: false },
@@ -50,6 +103,34 @@ async function startServer() {
 
   app.use("/api/", apiLimiter);
   app.use(express.json({ limit: "1mb" }));
+
+  // Rate Limiting Status / Health Endpoint
+  app.get("/api/rate-limit-status", (req, res) => {
+    const clientIp = req.ip || req.socket.remoteAddress || "127.0.0.1";
+    res.json({
+      status: "active",
+      provider: "express-rate-limit + token-bucket",
+      clientIp: clientIp.replace(/::ffff:/, ''),
+      policies: [
+        { name: "General API", limit: "100 req / 15 min", scope: "/api/*" },
+        { name: "AI Study Mentor & Quiz", limit: "25 req / 10 min", scope: "/api/study-assistant, /api/generate-quiz" },
+        { name: "Exam PDF Extraction", limit: "10 uploads / 15 min", scope: "/api/upload-exam" },
+        { name: "M-Pesa STK Payment", limit: "5 pushes / 10 min", scope: "/api/payment/stkpush" },
+        { name: "Demo Test Endpoint", limit: "5 req / 1 min", scope: "/api/test-rate-limit" }
+      ],
+      serverTime: new Date().toISOString()
+    });
+  });
+
+  // Dedicated Test Endpoint to demonstrate rate limiting in real-time
+  app.get("/api/test-rate-limit", testLimiter, (req, res) => {
+    res.json({
+      success: true,
+      message: "Request allowed by rate limiter.",
+      timestamp: new Date().toISOString(),
+      quotaRemaining: (req as any).rateLimit?.remaining ?? "N/A"
+    });
+  });
 
   // AI Quiz Generator Endpoint
   app.post("/api/generate-quiz", aiLimiter, async (req, res) => {
@@ -225,7 +306,7 @@ Key guidelines:
   });
 
   // PDF Import / Quiz Mixing
-  app.post("/api/upload-exam", aiLimiter, (req, res, next) => {
+  app.post("/api/upload-exam", uploadLimiter, (req, res, next) => {
     upload.single("pdf")(req, res, (err: any) => {
       if (err) {
         console.error("Multer upload error:", err);
@@ -475,7 +556,7 @@ Key guidelines:
   });
 
   // Mock M-Pesa Payment
-  app.post("/api/payment/stkpush", async (req, res) => {
+  app.post("/api/payment/stkpush", paymentLimiter, async (req, res) => {
     const { phone, amount } = req.body;
     
     if (!phone || typeof phone !== "string" || !/^\+?[0-9]{9,15}$/.test(phone.trim())) {

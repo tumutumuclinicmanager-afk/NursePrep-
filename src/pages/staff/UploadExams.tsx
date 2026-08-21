@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, Edit3, Database, Layers, ShieldCheck } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, Edit3, Database, Layers, ShieldCheck, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { collection, addDoc, getDocs, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { parseRateLimitResponse } from '@/lib/rateLimit';
 import QuestionBuilder from '@/components/staff/QuestionBuilder';
 import QuestionRepository from '@/components/staff/QuestionRepository';
 import ExamPublisher from '@/components/staff/ExamPublisher';
@@ -105,6 +106,11 @@ export default function UploadExams() {
         body: formData,
       });
 
+      if (response.status === 429) {
+        const rateInfo = await parseRateLimitResponse(response);
+        throw new Error(rateInfo.message || `Upload rate limit reached (10 files / 15 min). Please wait ${rateInfo.retryAfterSeconds}s before uploading again.`);
+      }
+
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const textErr = await response.text();
@@ -120,7 +126,7 @@ export default function UploadExams() {
       setUploadStatus('success');
     } catch (error: any) {
       console.error('Error uploading exam:', error);
-      alert(`Upload error: ${error?.message || 'Unknown error'}`);
+      alert(`Upload Notice: ${error?.message || 'Unknown error'}`);
       setUploadStatus('error');
     } finally {
       setIsUploading(false);

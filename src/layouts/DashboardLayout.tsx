@@ -76,7 +76,6 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
         { name: 'Upload Exams', icon: FileText, path: '/staff/upload' },
         { name: 'Live Sessions', icon: Video, path: '/staff/sessions' },
         { name: 'Student Queries', icon: MessageSquare, path: '/staff/queries' },
-        { name: 'Cloud Scalability', icon: Server, path: '/staff/scalability' },
       ];
     }
     return [
@@ -86,7 +85,6 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
       { name: 'Practice Exam Generator', icon: Brain, path: '/dashboard/generator' },
       { name: 'Performance', icon: FileText, path: '/dashboard/performance' },
       { name: 'AI Study Assistant', icon: BrainCircuit, path: '/dashboard/assistant' },
-      { name: 'Cloud Scalability', icon: Server, path: '/dashboard/scalability' },
     ];
   };
 

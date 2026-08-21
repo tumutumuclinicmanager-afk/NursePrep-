@@ -116,7 +116,6 @@ export default function App() {
           <Route path="generator" element={<QuizGeneratorPage />} />
           <Route path="courses" element={<MyCourses />} />
           <Route path="performance" element={<PerformancePage />} />
-          <Route path="scalability" element={<ScalabilityDashboard />} />
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
         </Route>
 
@@ -132,7 +131,6 @@ export default function App() {
           <Route path="upload" element={<UploadExams />} />
           <Route path="sessions" element={<LiveSessions />} />
           <Route path="queries" element={<StudentQueries />} />
-          <Route path="scalability" element={<ScalabilityDashboard />} />
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
         </Route>
         

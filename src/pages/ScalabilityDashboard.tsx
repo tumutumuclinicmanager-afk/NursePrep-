@@ -1,10 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Server, Cpu, ShieldAlert, Database, HardDrive, 
   Layers, Globe, Activity, CheckCircle2, RefreshCw, 
-  Zap, ArrowRight, Lock, Radio, CpuIcon, CloudLightning
+  Zap, ArrowRight, Lock, Radio, CpuIcon, CloudLightning,
+  Clock, ShieldCheck, AlertTriangle, Play
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+
+interface RateTestLog {
+  id: string;
+  time: string;
+  status: number;
+  message: string;
+  remaining?: string | number;
+  retryAfter?: number;
+}
 
 export default function ScalabilityDashboard() {
   // Simulator States
@@ -19,10 +29,93 @@ export default function ScalabilityDashboard() {
   const [rateLimitEnabled, setRateLimitEnabled] = useState<boolean>(true);
   const [blockedRequests, setBlockedRequests] = useState<number>(128);
 
+  // Live Rate Limiter Test Lab State
+  const [liveTestLogs, setLiveTestLogs] = useState<RateTestLog[]>([]);
+  const [isTestingRateLimit, setIsTestingRateLimit] = useState<boolean>(false);
+  const [activePolicies, setActivePolicies] = useState<any[]>([]);
+  const [rateLimitCooldownSec, setRateLimitCooldownSec] = useState<number>(0);
+
   const [queueJobs, setQueueJobs] = useState<number>(42);
   const [processingQueue, setProcessingQueue] = useState<boolean>(false);
 
   const [cdnRegion, setCdnRegion] = useState<string>('Global Edge (Cloudflare)');
+
+  useEffect(() => {
+    // Fetch live rate limiter policies from server
+    fetch('/api/rate-limit-status')
+      .then(res => res.json())
+      .then(data => {
+        if (data.policies) setActivePolicies(data.policies);
+      })
+      .catch(() => {
+        // Fallback default policies
+        setActivePolicies([
+          { name: "General API", limit: "100 req / 15 min", scope: "/api/*" },
+          { name: "AI Study Mentor & Quiz", limit: "25 req / 10 min", scope: "/api/study-assistant, /api/generate-quiz" },
+          { name: "Exam PDF Extraction", limit: "10 uploads / 15 min", scope: "/api/upload-exam" },
+          { name: "M-Pesa STK Payment", limit: "5 pushes / 10 min", scope: "/api/payment/stkpush" },
+          { name: "Demo Test Endpoint", limit: "5 req / 1 min", scope: "/api/test-rate-limit" }
+        ]);
+      });
+  }, []);
+
+  // Cooldown countdown
+  useEffect(() => {
+    if (rateLimitCooldownSec <= 0) return;
+    const interval = setInterval(() => {
+      setRateLimitCooldownSec(prev => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [rateLimitCooldownSec]);
+
+  const handleTestRateLimitRequest = async () => {
+    setIsTestingRateLimit(true);
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    try {
+      const res = await fetch('/api/test-rate-limit');
+      const data = await res.json();
+      
+      if (res.status === 429) {
+        setBlockedRequests(prev => prev + 1);
+        const retry = data.retryAfterSeconds || 60;
+        setRateLimitCooldownSec(retry);
+        setLiveTestLogs(prev => [
+          {
+            id: `log-${Date.now()}`,
+            time: now,
+            status: 429,
+            message: data.error || '429 Rate Limit Exceeded (5 req/min exceeded)',
+            remaining: 0,
+            retryAfter: retry
+          },
+          ...prev.slice(0, 7)
+        ]);
+      } else {
+        setLiveTestLogs(prev => [
+          {
+            id: `log-${Date.now()}`,
+            time: now,
+            status: 200,
+            message: data.message || '200 OK: Request allowed within rate quota',
+            remaining: data.quotaRemaining ?? 'Allowed'
+          },
+          ...prev.slice(0, 7)
+        ]);
+      }
+    } catch (err: any) {
+      setLiveTestLogs(prev => [
+        {
+          id: `log-${Date.now()}`,
+          time: now,
+          status: 500,
+          message: err?.message || 'Network error executing rate limit probe'
+        },
+        ...prev.slice(0, 7)
+      ]);
+    } finally {
+      setIsTestingRateLimit(false);
+    }
+  };
 
   const handleSimulateQueue = () => {
     setProcessingQueue(true);
@@ -226,6 +319,100 @@ export default function ScalabilityDashboard() {
                 <span>Queries saved: {cacheEnabled ? '97.8%' : '0% (Direct DB hammering)'}</span>
               </div>
               <Database className="w-8 h-8 text-blue-500 opacity-60" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Live Interactive Rate Limiting Engine Section */}
+      <div className="bg-white rounded-3xl p-6 lg:p-8 border border-slate-200/90 shadow-sm space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-bold">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] font-semibold mb-1">
+                <ShieldCheck className="w-3 h-3" /> Rate Limiting & Token-Bucket Gateway
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">Live API Rate Limiting Tester & Policy Monitor</h2>
+              <p className="text-xs text-slate-500">
+                Test real-time Express rate limiters with sliding windows, automatic 429 responses, and client retry countdowns.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleTestRateLimitRequest}
+              disabled={isTestingRateLimit || rateLimitCooldownSec > 0}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-2 shadow-md shadow-indigo-600/20"
+            >
+              {rateLimitCooldownSec > 0 ? (
+                <>
+                  <Clock className="w-3.5 h-3.5 animate-spin" /> Cooldown Active ({rateLimitCooldownSec}s)
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" /> Send Test Probe (Limit: 5/min)
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Policies Grid & Live Probe Logs */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Active Policies List */}
+          <div className="lg:col-span-5 space-y-3">
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Active Rate Limiting Policies</h3>
+            <div className="space-y-2.5">
+              {activePolicies.map((pol, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl text-xs flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-slate-900 block">{pol.name}</span>
+                    <span className="text-[11px] text-slate-500 font-mono">{pol.scope}</span>
+                  </div>
+                  <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200/60 rounded-lg text-[11px] font-semibold">
+                    {pol.limit}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Real-time Probe Results Console */}
+          <div className="lg:col-span-7 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Live Probe Telemetry & 429 Simulator</h3>
+              <span className="text-[11px] text-slate-400">Endpoint: <code className="text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">/api/test-rate-limit</code></span>
+            </div>
+
+            <div className="bg-slate-950 text-slate-200 rounded-2xl p-4 font-mono text-xs space-y-2 min-h-[190px] border border-slate-800 flex flex-col justify-start">
+              {liveTestLogs.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center py-8">
+                  <Activity className="w-6 h-6 mb-2 text-slate-600 animate-pulse" />
+                  <p>Click "Send Test Probe" to fire live requests against the rate limiter.</p>
+                  <p className="text-[10px] text-slate-600 mt-1">Exceeding 5 requests within 1 minute will trigger an HTTP 429 Too Many Requests response.</p>
+                </div>
+              ) : (
+                liveTestLogs.map(log => (
+                  <div key={log.id} className="flex items-start gap-2 text-[11px] pb-1.5 border-b border-slate-800/60 last:border-0">
+                    <span className="text-slate-500">[{log.time}]</span>
+                    <span className={`px-1.5 py-0.2 rounded font-bold ${log.status === 200 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}`}>
+                      HTTP {log.status}
+                    </span>
+                    <span className={log.status === 200 ? 'text-slate-300' : 'text-rose-300'}>
+                      {log.message}
+                    </span>
+                    {log.remaining !== undefined && (
+                      <span className="text-slate-500 ml-auto shrink-0">
+                        Remaining: {log.remaining}
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
