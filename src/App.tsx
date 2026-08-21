@@ -98,6 +98,7 @@ export default function App() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<PlaceholderPage title="About Us" />} />
           <Route path="/contact" element={<PlaceholderPage title="Contact" />} />
+          <Route path="/scalability" element={<Navigate to="/admin/scalability" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Route>

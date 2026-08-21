@@ -30,6 +30,64 @@ interface RatePolicy {
   description: string;
 }
 
+const defaultFallbackPolicies: RatePolicy[] = [
+  {
+    id: "general",
+    name: "General API Traffic",
+    category: "Core API Gateway",
+    scope: "/api/*",
+    max: 100,
+    windowMinutes: 15,
+    enabled: true,
+    limit: "100 req / 15 min",
+    description: "Standard REST API endpoints across user dashboards and listings."
+  },
+  {
+    id: "ai",
+    name: "AI Study Mentor & Quiz Generation",
+    category: "AI Generation",
+    scope: "/api/study-assistant, /api/generate-quiz",
+    max: 25,
+    windowMinutes: 10,
+    enabled: true,
+    limit: "25 req / 10 min",
+    description: "Limits expensive LLM tokens and automated question generation per IP window."
+  },
+  {
+    id: "upload",
+    name: "Exam PDF Extraction & OCR",
+    category: "File Uploads",
+    scope: "/api/upload-exam",
+    max: 10,
+    windowMinutes: 15,
+    enabled: true,
+    limit: "10 req / 15 min",
+    description: "Limits server-intensive PDF document parsing and OCR extraction."
+  },
+  {
+    id: "payment",
+    name: "M-Pesa STK Push Payment",
+    category: "Financial / Payments",
+    scope: "/api/payment/stkpush",
+    max: 5,
+    windowMinutes: 10,
+    enabled: true,
+    limit: "5 req / 10 min",
+    description: "Prevents STK push spam and protects Safaricom Daraja integration."
+  },
+  {
+    id: "test",
+    name: "Demo Test & Probe Endpoint",
+    category: "Testing & Sandbox",
+    scope: "/api/test-rate-limit",
+    max: 5,
+    windowMinutes: 1,
+    enabled: true,
+    limit: "5 req / 1 min",
+    description: "Interactive probe endpoint for admins to verify HTTP 429 response handling."
+  }
+];
+
 export default function ScalabilityDashboard() {
   // Simulator States
   const [lbActiveNodes, setLbActiveNodes] = useState<number>(3);
@@ -46,7 +104,7 @@ export default function ScalabilityDashboard() {
   // Live Rate Limiter Test Lab & Policy Manager State
   const [liveTestLogs, setLiveTestLogs] = useState<RateTestLog[]>([]);
   const [isTestingRateLimit, setIsTestingRateLimit] = useState<boolean>(false);
-  const [policies, setPolicies] = useState<RatePolicy[]>([]);
+  const [policies, setPolicies] = useState<RatePolicy[]>(defaultFallbackPolicies);
   const [isSavingPolicies, setIsSavingPolicies] = useState<boolean>(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('');
   const [rateLimitCooldownSec, setRateLimitCooldownSec] = useState<number>(0);
@@ -174,7 +232,12 @@ export default function ScalabilityDashboard() {
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     try {
       const res = await fetch('/api/test-rate-limit');
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { message: `HTTP ${res.status}` };
+      }
       
       if (res.status === 429) {
         setBlockedRequests(prev => prev + 1);
@@ -196,7 +259,7 @@ export default function ScalabilityDashboard() {
           {
             id: `log-${Date.now()}`,
             time: now,
-            status: 200,
+            status: res.status || 200,
             message: data.message || '200 OK: Probe accepted within configured category quota',
             remaining: data.quotaRemaining ?? 'Allowed'
           },

@@ -163,6 +163,8 @@ async function startServer() {
     validate: { trustProxy: false, xForwardedForHeader: false },
   });
 
+  app.use(express.json({ limit: "1mb" }));
+
   // Interactive Demonstration Limiter
   const testLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
@@ -174,8 +176,15 @@ async function startServer() {
     validate: { trustProxy: false, xForwardedForHeader: false },
   });
 
-  app.use("/api/", apiLimiter);
-  app.use(express.json({ limit: "1mb" }));
+  // Dedicated Test Endpoint to demonstrate rate limiting in real-time (supports GET and POST)
+  app.all("/api/test-rate-limit", testLimiter, (req, res) => {
+    res.json({
+      success: true,
+      message: "Request allowed by rate limiter probe.",
+      timestamp: new Date().toISOString(),
+      quotaRemaining: (req as any).rateLimit?.remaining ?? "Allowed"
+    });
+  });
 
   // Rate Limiting Status / Health Endpoint
   app.get("/api/rate-limit-status", (req, res) => {
@@ -269,15 +278,7 @@ async function startServer() {
     }
   });
 
-  // Dedicated Test Endpoint to demonstrate rate limiting in real-time
-  app.get("/api/test-rate-limit", testLimiter, (req, res) => {
-    res.json({
-      success: true,
-      message: "Request allowed by rate limiter.",
-      timestamp: new Date().toISOString(),
-      quotaRemaining: (req as any).rateLimit?.remaining ?? "N/A"
-    });
-  });
+  app.use("/api/", apiLimiter);
 
   // AI Quiz Generator Endpoint
   app.post("/api/generate-quiz", aiLimiter, async (req, res) => {
