@@ -32,6 +32,7 @@ export function PublicLayout() {
       console.warn('Sign out warning:', e);
     }
     localStorage.removeItem('userRole');
+    localStorage.removeItem('nurseprep_last_activity');
     setUserRole(null);
     setCurrentUser(null);
     navigate('/login');

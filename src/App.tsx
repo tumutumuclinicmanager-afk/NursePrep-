@@ -29,6 +29,7 @@ import StudyAssistantPage from './pages/StudyAssistantPage';
 import MyCourses from './pages/MyCourses';
 import PerformancePage from './pages/PerformancePage';
 import ScalabilityDashboard from './pages/ScalabilityDashboard';
+import { SessionTimeoutManager } from './components/SessionTimeoutManager';
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -51,6 +52,8 @@ function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode; 
   }, []);
 
   const userRole = localStorage.getItem('userRole');
+  const lastActiveStr = localStorage.getItem('nurseprep_last_activity');
+  const isExpired = lastActiveStr ? (Date.now() - parseInt(lastActiveStr, 10) > 30 * 60 * 1000) : false;
 
   if (loading) {
     return (
@@ -58,6 +61,12 @@ function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode; 
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
+  }
+
+  if (isExpired) {
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('nurseprep_last_activity');
+    return <Navigate to="/login?reason=timeout" replace />;
   }
 
   if (!user && !userRole) {
@@ -90,6 +99,7 @@ function PublicOrDashboardExams() {
 export default function App() {
   return (
     <BrowserRouter>
+      <SessionTimeoutManager />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />

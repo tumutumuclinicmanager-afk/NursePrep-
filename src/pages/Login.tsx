@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Chrome } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Chrome, Clock, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { auth, db, googleProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -8,6 +8,8 @@ import NurseLoadingAnimation from '@/components/NurseLoadingAnimation';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isTimeout = searchParams.get('reason') === 'timeout';
   const [error, setError] = useState('');
 
   const [email, setEmail] = useState('');
@@ -102,6 +104,7 @@ export default function Login() {
       }
       
       localStorage.setItem('userRole', userRole);
+      localStorage.setItem('nurseprep_last_activity', Date.now().toString());
       if (userRole === 'admin') {
         navigate('/admin');
       } else if (userRole === 'staff') {
@@ -146,6 +149,7 @@ export default function Login() {
       }
       
       localStorage.setItem('userRole', userRole);
+      localStorage.setItem('nurseprep_last_activity', Date.now().toString());
       if (userRole === 'admin') {
         navigate('/admin');
       } else if (userRole === 'staff') {
@@ -172,6 +176,16 @@ export default function Login() {
         </div>
 
         <div className="p-8">
+          {isTimeout && !error && (
+            <div className="mb-5 p-3.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-xs flex items-start gap-2.5 shadow-2xs">
+              <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-bold block">Session Expired</strong>
+                <span>Your session expired due to 30 minutes of inactivity. Please sign in again to continue.</span>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
               {error}

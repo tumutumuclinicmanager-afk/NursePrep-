@@ -46,6 +46,7 @@ export default function Register() {
       });
       
       localStorage.setItem('userRole', userRole);
+      localStorage.setItem('nurseprep_last_activity', Date.now().toString());
       if (userRole === 'admin') {
         navigate('/admin');
       } else if (userRole === 'staff') {

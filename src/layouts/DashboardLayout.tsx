@@ -55,6 +55,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
       console.warn("Sign out warning:", e);
     }
     localStorage.removeItem('userRole');
+    localStorage.removeItem('nurseprep_last_activity');
     navigate('/login');
   };
 
