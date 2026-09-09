@@ -392,17 +392,25 @@ async function startServer() {
     }
   });
 
+  const cleanApiKey = (key?: string): string => {
+    if (!key) return "";
+    let trimmed = key.trim();
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+      trimmed = trimmed.substring(1, trimmed.length - 1).trim();
+    }
+    return trimmed;
+  };
+
   const isValidApiKey = (key?: string): boolean => {
-    if (!key) return false;
-    const trimmed = key.trim();
-    if (!trimmed || trimmed.length < 10) return false;
-    if (trimmed === "MY_GEMINI_API_KEY" || trimmed === "dummy_key" || trimmed === "undefined" || trimmed === "null") return false;
+    const cleaned = cleanApiKey(key);
+    if (!cleaned || cleaned.length < 10) return false;
+    if (cleaned === "MY_GEMINI_API_KEY" || cleaned === "dummy_key" || cleaned === "undefined" || cleaned === "null") return false;
     return true;
   };
 
   // AI Diagnostic & Health Check Endpoint
   app.get("/api/ai-status", async (req, res) => {
-    const rawKey = process.env.GEMINI_API_KEY;
+    const rawKey = cleanApiKey(process.env.GEMINI_API_KEY);
     const isConfigured = isValidApiKey(rawKey);
     const keyPreview = isConfigured && rawKey 
       ? `${rawKey.substring(0, 4)}...${rawKey.substring(rawKey.length - 4)}` 
@@ -414,7 +422,7 @@ async function startServer() {
     if (req.query.probe === "true" && isConfigured) {
       try {
         const ai = new GoogleGenAI({
-          apiKey: rawKey!,
+          apiKey: rawKey,
           httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
         });
         const testRes = await ai.models.generateContent({
@@ -455,17 +463,17 @@ async function startServer() {
         return;
       }
 
-      const rawKey = process.env.GEMINI_API_KEY;
+      const rawKey = cleanApiKey(process.env.GEMINI_API_KEY);
       if (!isValidApiKey(rawKey)) {
         console.warn("GEMINI_API_KEY is missing or invalid in server environment variables.");
         res.json({
-          reply: `### ⚠️ Configuration Required: GEMINI_API_KEY Missing\n\nThe server received your study query (*"${message.substring(0, 80)}"*), but the **GEMINI_API_KEY** environment variable is not configured on this deployed container.\n\n**To enable live AI study tutoring:**\n1. Open your project in Google AI Studio.\n2. In the top-right menu, open **Settings** (gear icon) > **Secrets**.\n3. Enter your Gemini API Key for \`GEMINI_API_KEY\`.\n4. Click **Deploy** to update your live deployment.\n\n---\n*In the meantime, offline NCLEX question rationales and clinical reference cards remain active.*`
+          reply: `### ⚠️ Configuration Notice: GEMINI_API_KEY Missing\n\nThe server received your study query (*"${message.substring(0, 80)}"*), but the **GEMINI_API_KEY** environment variable is not configured on this deployed container.\n\n**To enable live AI study tutoring:**\n1. Open your project in Google AI Studio.\n2. In the top-right menu, open **Settings** (gear icon) > **Secrets**.\n3. Enter your Gemini API Key for \`GEMINI_API_KEY\`.\n4. Click **Deploy** in the top bar to update your live deployment.\n\n---\n*In the meantime, offline NCLEX question rationales and clinical reference cards remain active.*`
         });
         return;
       }
 
       const ai = new GoogleGenAI({
-        apiKey: rawKey!,
+        apiKey: rawKey,
         httpOptions: {
           headers: {
             'User-Agent': 'aistudio-build',
@@ -559,18 +567,19 @@ Key guidelines:
       res.json({ reply: replyText });
     } catch (error: any) {
       console.error("Study assistant error:", error);
-      const isDemandError = error?.message?.includes('high demand') || error?.status === 503;
-      const isAuthError = error?.message?.includes('API key') || error?.status === 401 || error?.status === 403;
+      const errMessage = error?.message || String(error);
+      const isDemandError = errMessage.includes('high demand') || error?.status === 503;
+      const isAuthError = errMessage.includes('API key') || errMessage.includes('API_KEY_SERVICE_BLOCKED') || error?.status === 401 || error?.status === 403;
 
-      let note = "The AI study assistant is currently operating with local clinical rules while cloud endpoints synchronize.";
+      let note = `Server communication note: ${errMessage}`;
       if (isDemandError) {
         note = "The upstream Gemini service is experiencing a temporary spike in traffic. Please retry your question in a few moments.";
       } else if (isAuthError) {
-        note = "Gemini API authentication failed. Please verify your GEMINI_API_KEY in project secrets/settings.";
+        note = `Gemini API authentication notice (${errMessage}). If using a Google Cloud API Key, verify that the 'Generative Language API' is enabled in your Google Cloud Console and no restrictive API key filters are blocking it.`;
       }
 
       res.json({ 
-        reply: `### 🩺 NursePrep AI Clinical Study Note\n\n**Topic Review:** *${(req.body.message || '').substring(0, 100)}*\n\n1. **Core Clinical Assessment:**\n   * Prioritize the **ABC Framework** (Airway, Breathing, Circulation) and **Maslow's Hierarchy of Needs**.\n   * Always assess and stabilize acute physiological changes before taking secondary actions.\n\n2. **Patient Safety & NCLEX Best Practices:**\n   * Verify 2 patient identifiers before medication administration.\n   * Continuously monitor vital signs and trending lab values.\n\n💡 *Note: ${note}*` 
+        reply: `### 🩺 NursePrep AI Study Response\n\n${isAuthError || isDemandError ? `⚠️ **System Notice**: ${note}\n\n---\n` : ''}**Clinical Review for:** *"${(req.body.message || '').substring(0, 100)}"*:\n\n1. **Core Clinical Assessment & Interventions:**\n   * Apply the **ABC Framework** (Airway, Breathing, Circulation) and **Maslow's Hierarchy of Needs** to prioritize emergent patient findings.\n   * Always assess and stabilize acute physiological changes before taking secondary actions.\n\n2. **Patient Safety & NCLEX Best Practices:**\n   * Verify 2 patient identifiers before medication administration.\n   * Monitor critical lab trends and escalate sudden clinical deteriorations promptly.` 
       });
     }
   });

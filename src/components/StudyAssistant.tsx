@@ -58,16 +58,74 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
         const data = await res.json();
         if (data.keyConfigured && data.probeSuccess !== false) {
           setBackendStatus({ status: 'ready', keyConfigured: true, probeMessage: data.probeMessage });
+          if (probe) {
+            setMessages(prev => [
+              ...prev,
+              {
+                id: `probe-${Date.now()}`,
+                role: 'assistant',
+                text: `✅ **AI Connection Verified**: Successfully connected to Gemini 3.1 Flash-Lite on the server. Live clinical reasoning is online and ready!`,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }
+            ]);
+          }
         } else if (!data.keyConfigured) {
-          setBackendStatus({ status: 'unconfigured', keyConfigured: false });
+          setBackendStatus({ status: 'unconfigured', keyConfigured: false, probeMessage: 'GEMINI_API_KEY environment variable is not configured.' });
+          if (probe) {
+            setMessages(prev => [
+              ...prev,
+              {
+                id: `probe-${Date.now()}`,
+                role: 'assistant',
+                text: `⚠️ **AI Test Result: API Key Unconfigured**\n\nThe server is running, but \`GEMINI_API_KEY\` is missing in your deployment environment.\n\n**To configure:**\n1. In Google AI Studio, open **Settings** (gear icon) > **Secrets**.\n2. Add \`GEMINI_API_KEY\`.\n3. Click **Deploy** in the top bar to update the container.`,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }
+            ]);
+          }
         } else {
-          setBackendStatus({ status: 'offline', probeMessage: data.probeMessage || 'API check failed' });
+          const failMsg = data.probeMessage || 'Model probe failed';
+          setBackendStatus({ status: 'offline', probeMessage: failMsg });
+          if (probe) {
+            setMessages(prev => [
+              ...prev,
+              {
+                id: `probe-${Date.now()}`,
+                role: 'assistant',
+                text: `❌ **AI Test Result: Connection Failed**\n\n**Error details:** \`${failMsg}\`\n\n*If using a Google Cloud API Key, verify that the "Generative Language API" is enabled in your Google Cloud project and the key has no restrictive service blocks.*`,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }
+            ]);
+          }
         }
       } else {
-        setBackendStatus({ status: 'offline', probeMessage: `HTTP ${res.status}` });
+        const failMsg = `HTTP ${res.status} from /api/ai-status`;
+        setBackendStatus({ status: 'offline', probeMessage: failMsg });
+        if (probe) {
+          setMessages(prev => [
+            ...prev,
+            {
+              id: `probe-${Date.now()}`,
+              role: 'assistant',
+              text: `❌ **AI Test Result: HTTP ${res.status}**\n\nCould not reach \`/api/ai-status\`. If this site is deployed on a static hosting provider (Vercel/Netlify), full-stack Node API routes require Google Cloud Run.`,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ]);
+        }
       }
     } catch (e: any) {
-      setBackendStatus({ status: 'offline', probeMessage: e?.message || 'Cannot reach API' });
+      const failMsg = e?.message || 'Cannot reach API';
+      setBackendStatus({ status: 'offline', probeMessage: failMsg });
+      if (probe) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `probe-${Date.now()}`,
+            role: 'assistant',
+            text: `❌ **AI Test Result: Network Error**\n\n\`${failMsg}\`. Please ensure the server container is running and redeployed.`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+      }
     } finally {
       if (probe) setIsTestingProbe(false);
     }
@@ -450,7 +508,11 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>
-              Cannot connect to <code>/api/ai-status</code>. If deployed on a static host (Vercel/Netlify/Firebase), full-stack Node features require Google Cloud Run.
+              {backendStatus.probeMessage ? (
+                <>Connection Note: <code>{backendStatus.probeMessage}</code>. Click "Test AI" to diagnose.</>
+              ) : (
+                <>Cannot connect to <code>/api/ai-status</code>. Full-stack Node features require Google Cloud Run deployment.</>
+              )}
             </span>
           </div>
           <button
