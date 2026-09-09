@@ -13,6 +13,8 @@ import { db, auth } from '@/lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import { ALL_QUIZ_QUESTIONS, normalizeExamCategory, ALL_EXAM_TYPES, ENTRANCE_EXAMS, NURSING_EXAMS, EXIT_EXAMS } from '@/data/quizQuestions';
 import { normalizeQuestion } from '@/lib/utils';
+import { useTrialCountdown, setSimulatedTrialExpired } from '@/lib/trialManager';
+import { TrialExpiredExamLock } from '@/components/TrialExpiredExamLock';
 
 const clinicalDomains = [
   'All Specialties',
@@ -454,6 +456,15 @@ export default function ExamBank() {
   const [selectedPlanFilter, setSelectedPlanFilter] = useState<'All' | 'My Plan Access' | 'free' | 'basic' | 'gold' | 'platinum'>('All');
   const [requiredPlanModalExam, setRequiredPlanModalExam] = useState<ExamItem | null>(null);
   const [practiceLimitInfo, setPracticeLimitInfo] = useState<{ limit: number; total: number } | null>(null);
+
+  // 14-Day Free Trial hook
+  const { trial, loading: trialLoading, refreshTrial } = useTrialCountdown(auth.currentUser);
+
+  useEffect(() => {
+    if (trial.isPaid && trial.plan) {
+      setUserSubscriptionPlan(trial.plan as any);
+    }
+  }, [trial.isPaid, trial.plan]);
 
   // State for dynamic board categories
   const [dynamicBoardCategories, setDynamicBoardCategories] = useState<string[]>([...ALL_EXAM_TYPES]);
@@ -1337,6 +1348,25 @@ export default function ExamBank() {
     </>
   );
 
+  // Check 14-day trial status: if countdown ends, people get a page saying please upgrade your account to access the exams repository
+  const userRole = localStorage.getItem('userRole') || 'student';
+  const isPrivileged = userRole === 'admin' || userRole === 'staff';
+
+  if (!trialLoading && trial.isExpired && !trial.isPaid && !isPrivileged) {
+    return (
+      <div className="min-h-screen bg-slate-50/50 pb-20">
+        <TrialExpiredExamLock 
+          trial={trial} 
+          onRefresh={async () => {
+            await refreshTrial();
+            await fetchUserPurchases();
+          }} 
+        />
+        {modalsContent}
+      </div>
+    );
+  }
+
   if (selectedExamTypePage) {
     const typeExams = examsList.filter(ex => ex.category === selectedExamTypePage || normalizeExamCategory(ex.category) === normalizeExamCategory(selectedExamTypePage));
     const categoriesList = EXAM_TYPE_CATEGORIES[selectedExamTypePage] || ['Core Concepts', 'Clinical Specialties', 'Diagnostic Assessment', 'Practice Mock Bank'];
@@ -1910,9 +1940,27 @@ export default function ExamBank() {
           </p>
           <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
             <span className="text-slate-300">Your Active Plan:</span>
-            <span className="px-3 py-1 rounded-full font-extrabold bg-blue-500 text-white uppercase tracking-wider">
-              {userSubscriptionPlan.toUpperCase()} PLAN
-            </span>
+            {trial.isPaid ? (
+              <span className="px-3 py-1 rounded-full font-extrabold bg-emerald-600 text-white uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+                <ShieldCheck className="w-3.5 h-3.5" /> {userSubscriptionPlan.toUpperCase()} PLAN (UNLIMITED)
+              </span>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-3 py-1 rounded-full font-black bg-amber-400 text-slate-950 uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+                  <Clock className="w-3.5 h-3.5" /> 14-DAY TRIAL: {trial.daysRemaining}d {trial.hoursRemaining}h {trial.minutesRemaining}m {trial.secondsRemaining}s LEFT
+                </span>
+                <button
+                  onClick={async () => {
+                    await setSimulatedTrialExpired(true, auth.currentUser);
+                    await refreshTrial();
+                  }}
+                  className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-semibold text-[10px] transition-colors"
+                  title="Simulate what happens when the 14 days finish"
+                >
+                  ⚡ Test: Expire Countdown Now
+                </button>
+              </div>
+            )}
             <span className="text-slate-500 hidden sm:inline">|</span>
             <span className="text-slate-300 font-medium">Filter by Access Plan:</span>
             <div className="inline-flex flex-wrap items-center gap-1.5 p-1 bg-slate-800/80 rounded-lg border border-slate-700">

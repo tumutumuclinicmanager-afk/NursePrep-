@@ -34,9 +34,11 @@ import {
   UserBadgeState, 
   ICON_MAP 
 } from '@/lib/badges';
+import { useTrialCountdown } from '@/lib/trialManager';
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
+  const { trial } = useTrialCountdown(auth.currentUser);
   const [stats, setStats] = useState({
     questionsAnswered: 0,
     averageScore: 0,
@@ -191,6 +193,60 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* 14-Day Free Trial Banner / Status */}
+      {!trial.isPaid && (
+        trial.isExpired ? (
+          <div className="bg-gradient-to-r from-rose-900 to-slate-900 border border-rose-600/60 rounded-2xl p-5 text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Clock className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-white">14-Day Free Trial Ended</h3>
+                  <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded bg-rose-500/30 text-rose-200 border border-rose-400/30">
+                    Repository Locked
+                  </span>
+                </div>
+                <p className="text-xs text-rose-200/90 mt-0.5">
+                  Your free trial period has concluded. Please upgrade your account to access the complete exams repository.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => navigate('/pricing')}
+              className="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs shrink-0"
+            >
+              Upgrade Account Now
+            </Button>
+          </div>
+        ) : (
+          <div className="bg-gradient-to-r from-amber-500/10 via-blue-500/10 to-indigo-500/10 border border-amber-300/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 font-bold shadow-xs">
+                <Clock className="w-5 h-5 text-slate-950" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-extrabold text-slate-900">14-Day Free Trial Active</h4>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold border border-emerald-300">
+                    Live Countdown
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Time remaining: <span className="font-mono font-bold text-slate-900">{trial.daysRemaining}d {trial.hoursRemaining}h {trial.minutesRemaining}m {trial.secondsRemaining}s</span>. Full access to exam previews enabled.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button onClick={() => navigate('/pricing')} className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs px-4 py-2 rounded-xl shadow-xs">
+                Upgrade Plan
+              </Button>
+            </div>
+          </div>
+        )
+      )}
 
       {/* Top Summary Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

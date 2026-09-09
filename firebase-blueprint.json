@@ -9,6 +9,8 @@
         "name": { "type": "string", "description": "User display name" },
         "role": { "type": "string", "enum": ["student", "staff", "admin"], "description": "Assigned access role" },
         "subscriptionPlan": { "type": "string", "enum": ["free", "basic", "gold", "platinum"], "description": "Current subscription plan tier of user" },
+        "trialStartDate": { "type": "string", "description": "ISO timestamp when the 14-day free trial began" },
+        "trialExpiresAt": { "type": "string", "description": "ISO timestamp when the 14-day free trial ends" },
         "createdAt": { "type": "string", "description": "ISO timestamp of account registration" }
       },
       "required": ["email", "role"]

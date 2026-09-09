@@ -11,6 +11,8 @@ import { ALL_QUIZ_QUESTIONS, NURSING_UNITS, NursingUnit, ALL_EXAM_TYPES, normali
 import { collection, addDoc, getDocs, query } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTrialCountdown } from '@/lib/trialManager';
+import { TrialExpiredExamLock } from '@/components/TrialExpiredExamLock';
 
 interface QuizGeneratorProps {
   embeddedModal?: boolean;
@@ -28,6 +30,11 @@ export default function QuizGeneratorPage({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlUnit = searchParams.get('unit');
+
+  // Trial countdown check
+  const { trial, loading: trialLoading, refreshTrial } = useTrialCountdown(auth.currentUser);
+  const userRole = localStorage.getItem('userRole') || 'student';
+  const isPrivileged = userRole === 'admin' || userRole === 'staff';
 
   // Configuration State
   const [selectedExamMode, setSelectedExamMode] = useState<string>('All');
@@ -597,6 +604,37 @@ export default function QuizGeneratorPage({
 
     return null;
   };
+
+  if (!trialLoading && trial.isExpired && !trial.isPaid && !isPrivileged) {
+    if (embeddedModal) {
+      return (
+        <div className="p-6 text-center space-y-4 bg-white rounded-2xl border border-rose-200">
+          <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-extrabold text-slate-900">Trial Period Completed</h3>
+          <p className="text-xs text-slate-600 max-w-md mx-auto">
+            Your 14-day free preview period has ended. Please upgrade your account to generate custom quizzes and access the full exam repository.
+          </p>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            {onCloseModal && (
+              <Button variant="outline" onClick={onCloseModal}>
+                Close
+              </Button>
+            )}
+            <Button onClick={() => navigate('/pricing')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold">
+              Upgrade Account
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="pb-16">
+        <TrialExpiredExamLock trial={trial} onRefresh={refreshTrial} />
+      </div>
+    );
+  }
 
   return (
     <div className={`max-w-5xl mx-auto ${embeddedModal ? 'p-0' : 'p-4 md:p-8 space-y-8'}`}>

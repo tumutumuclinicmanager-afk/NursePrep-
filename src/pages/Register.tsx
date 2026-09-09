@@ -33,6 +33,12 @@ export default function Register() {
         userRole = 'admin';
       }
       
+      // Set up 14-day free trial dates
+      const now = new Date();
+      const trialDurationMs = 14 * 24 * 60 * 60 * 1000;
+      const trialStartDate = now.toISOString();
+      const trialExpiresAt = new Date(now.getTime() + trialDurationMs).toISOString();
+
       // Save profile to Firestore (using setDoc with user.uid to align with rules)
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         userId: userCredential.user.uid,
@@ -41,6 +47,9 @@ export default function Register() {
         role: role,
         status: 'Active',
         subscriptionPlan: 'free',
+        trialStartDate: trialStartDate,
+        trialExpiresAt: trialExpiresAt,
+        createdAt: trialStartDate,
         added: new Date().toISOString().split('T')[0],
         targetExam: exam
       });
