@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import multer from "multer";
 import * as pdfParseModule from "pdf-parse";
@@ -27,6 +28,18 @@ async function startServer() {
       crossOriginEmbedderPolicy: false,
     })
   );
+
+  // CORS & Preflight handling for deployed sites and cross-origin proxies
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Range");
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+    next();
+  });
 
   // Helper to format consistent Rate Limit 429 JSON response
   const rateLimitHandler = (categoryKey: string, fallbackMessage: string) => {
@@ -379,6 +392,46 @@ async function startServer() {
     }
   });
 
+  // AI Diagnostic & Health Check Endpoint
+  app.get("/api/ai-status", async (req, res) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    const isConfigured = Boolean(apiKey && apiKey.trim().length > 0);
+    const keyPreview = isConfigured && apiKey 
+      ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` 
+      : null;
+
+    let probeSuccess: boolean | null = null;
+    let probeMessage: string | null = null;
+
+    if (req.query.probe === "true" && isConfigured) {
+      try {
+        const ai = new GoogleGenAI({
+          apiKey: apiKey!,
+          httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+        });
+        const testRes = await ai.models.generateContent({
+          model: "gemini-3.1-flash-lite",
+          contents: "Say 'OK' in one word."
+        });
+        probeSuccess = true;
+        probeMessage = testRes?.text?.trim() || "OK";
+      } catch (err: any) {
+        probeSuccess = false;
+        probeMessage = err?.message || String(err);
+      }
+    }
+
+    res.json({
+      status: isConfigured ? "configured" : "unconfigured",
+      model: "gemini-3.1-flash-lite",
+      keyConfigured: isConfigured,
+      keyPreview,
+      probeSuccess,
+      probeMessage,
+      serverTime: new Date().toISOString()
+    });
+  });
+
   // AI Study Assistant Endpoint
   app.post("/api/study-assistant", aiLimiter, async (req, res) => {
     try {
@@ -395,11 +448,16 @@ async function startServer() {
       }
 
       const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
+      if (!apiKey || apiKey.trim() === "") {
         console.warn("GEMINI_API_KEY is missing from server environment variables.");
+        res.json({
+          reply: `### ⚠️ Configuration Required: GEMINI_API_KEY Missing\n\nThe server received your study query (*"${message.substring(0, 80)}"*), but the **GEMINI_API_KEY** environment variable is not configured on this deployed container.\n\n**To enable live AI study tutoring:**\n1. Open your project in Google AI Studio or your Cloud Run container settings.\n2. In the left or top menu, open **Settings > Secrets**.\n3. Add \`GEMINI_API_KEY\` with your Gemini API Key.\n4. Click **Deploy** to re-deploy the updated container.\n\n---\n*In the meantime, local NCLEX clinical guides and offline question rationales remain accessible.*`
+        });
+        return;
       }
+
       const ai = new GoogleGenAI({
-        apiKey: apiKey || "dummy_key",
+        apiKey,
         httpOptions: {
           headers: {
             'User-Agent': 'aistudio-build',
@@ -429,16 +487,23 @@ Key guidelines:
         systemInstruction += `\nProvide a comprehensive NCLEX question rationale breakdown explaining why the correct option is right and why distracting options are incorrect.`;
       }
 
-      // Format history messages if provided
+      // Format history messages if provided (ensuring first turn is user)
       let formattedContents: any[] = [];
       if (Array.isArray(history) && history.length > 0) {
-        for (const item of history.slice(-10)) {
+        for (const item of history.slice(-8)) {
           if (item && item.role && item.text && typeof item.text === 'string') {
             formattedContents.push({
               role: item.role === 'user' ? 'user' : 'model',
               parts: [{ text: item.text.substring(0, 1500) }]
             });
           }
+        }
+        // Ensure Gemini contents starts with a user message
+        if (formattedContents.length > 0 && formattedContents[0].role === 'model') {
+          formattedContents.unshift({
+            role: 'user',
+            parts: [{ text: 'Hello, I am a nursing student preparing for the NCLEX exam.' }]
+          });
         }
       }
 
@@ -486,9 +551,18 @@ Key guidelines:
       res.json({ reply: replyText });
     } catch (error: any) {
       console.error("Study assistant error:", error);
-      // Resilient fallback so client UI always receives a helpful clinical response
+      const isDemandError = error?.message?.includes('high demand') || error?.status === 503;
+      const isAuthError = error?.message?.includes('API key') || error?.status === 401 || error?.status === 403;
+
+      let note = "The AI study assistant is currently operating with local clinical rules while cloud endpoints synchronize.";
+      if (isDemandError) {
+        note = "The upstream Gemini service is experiencing a temporary spike in traffic. Please retry your question in a few moments.";
+      } else if (isAuthError) {
+        note = "Gemini API authentication failed. Please verify your GEMINI_API_KEY in project secrets/settings.";
+      }
+
       res.json({ 
-        reply: `### 🩺 NursePrep AI Clinical Study Note\n\n**Topic Review:** *${(req.body.message || '').substring(0, 100)}*\n\n1. **Core Clinical Assessment:**\n   * Prioritize the **ABC Framework** (Airway, Breathing, Circulation) and **Maslow's Hierarchy of Needs**.\n   * Always assess and stabilize acute physiological changes before taking secondary actions.\n\n2. **Patient Safety & NCLEX Best Practices:**\n   * Verify 2 patient identifiers before medication administration.\n   * Continuously monitor vital signs and trending lab values.\n\n💡 *Note: The AI study assistant is currently operating with local clinical rules while cloud endpoints synchronize.*` 
+        reply: `### 🩺 NursePrep AI Clinical Study Note\n\n**Topic Review:** *${(req.body.message || '').substring(0, 100)}*\n\n1. **Core Clinical Assessment:**\n   * Prioritize the **ABC Framework** (Airway, Breathing, Circulation) and **Maslow's Hierarchy of Needs**.\n   * Always assess and stabilize acute physiological changes before taking secondary actions.\n\n2. **Patient Safety & NCLEX Best Practices:**\n   * Verify 2 patient identifiers before medication administration.\n   * Continuously monitor vital signs and trending lab values.\n\n💡 *Note: ${note}*` 
       });
     }
   });
@@ -785,10 +859,18 @@ Key guidelines:
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    let distPath = path.join(process.cwd(), 'dist');
+    if (!fs.existsSync(distPath) && fs.existsSync(path.join(process.cwd(), 'index.html'))) {
+      distPath = process.cwd();
+    }
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send("Application index.html not found.");
+      }
     });
   }
 

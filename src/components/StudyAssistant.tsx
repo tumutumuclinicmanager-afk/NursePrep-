@@ -41,8 +41,41 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
   const [errorText, setErrorText] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [rateLimitCooldown, setRateLimitCooldown] = useState<number>(0);
+  const [backendStatus, setBackendStatus] = useState<{
+    status: 'checking' | 'ready' | 'unconfigured' | 'offline';
+    keyConfigured?: boolean;
+    probeMessage?: string;
+  }>({ status: 'checking' });
+  const [isTestingProbe, setIsTestingProbe] = useState(false);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const checkBackendStatus = async (probe = false) => {
+    if (probe) setIsTestingProbe(true);
+    try {
+      const res = await fetch(`/api/ai-status?probe=${probe ? 'true' : 'false'}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.keyConfigured && data.probeSuccess !== false) {
+          setBackendStatus({ status: 'ready', keyConfigured: true, probeMessage: data.probeMessage });
+        } else if (!data.keyConfigured) {
+          setBackendStatus({ status: 'unconfigured', keyConfigured: false });
+        } else {
+          setBackendStatus({ status: 'offline', probeMessage: data.probeMessage || 'API check failed' });
+        }
+      } else {
+        setBackendStatus({ status: 'offline', probeMessage: `HTTP ${res.status}` });
+      }
+    } catch (e: any) {
+      setBackendStatus({ status: 'offline', probeMessage: e?.message || 'Cannot reach API' });
+    } finally {
+      if (probe) setIsTestingProbe(false);
+    }
+  };
+
+  useEffect(() => {
+    checkBackendStatus();
+  }, []);
 
   // Active Rate Limit Countdown Timer
   useEffect(() => {
@@ -211,16 +244,36 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
           const data = await res.json();
           replyText = data.reply || '';
         }
+      } else {
+        // Non-200 HTTP response from backend
+        let serverErrorDetail = '';
+        try {
+          const errData = await res.json();
+          serverErrorDetail = errData.error || errData.message || '';
+        } catch {
+          // not JSON
+        }
+
+        if (res.status === 404) {
+          console.warn('/api/study-assistant returned 404. Checking fallback.');
+          const fallback = await generateFallbackAIResponse(cleanPrompt, selectedUnit, assistantMode);
+          replyText = `⚠️ **Backend Service Notice (HTTP 404)**: The \`/api/study-assistant\` endpoint was not found on this domain.\n\n*If you are viewing this app on a static hosting provider (e.g., Vercel, Netlify, or Firebase Hosting), full-stack Express API endpoints require deployment on Google Cloud Run.*\n\n---\n${fallback}`;
+        } else {
+          console.warn(`Server returned ${res.status}:`, serverErrorDetail);
+          const fallback = await generateFallbackAIResponse(cleanPrompt, selectedUnit, assistantMode);
+          replyText = `⚠️ **Server Status (HTTP ${res.status})**: ${serverErrorDetail || 'AI generation encountered a temporary server error.'}\n\n*Please verify \`GEMINI_API_KEY\` in your project settings (Settings > Secrets) and ensure your container is redeployed.*\n\n---\n${fallback}`;
+        }
       }
 
-      // If server returned 404 or non-200 (e.g., static hosting site like nurseprep.co.ke), use fallback AI
+      // If server returned 200 but empty text, use fallback AI
       if (!replyText && res.status !== 429) {
-        console.warn(`API server returned status ${res.status}. Using fallback NCLEX AI mentor.`);
+        console.warn(`API server returned empty reply. Using fallback NCLEX AI mentor.`);
         replyText = await generateFallbackAIResponse(cleanPrompt, selectedUnit, assistantMode);
       }
     } catch (err: any) {
-      console.warn('Network error reaching /api/study-assistant. Using fallback NCLEX AI mentor.', err);
-      replyText = await generateFallbackAIResponse(cleanPrompt, selectedUnit, assistantMode);
+      console.warn('Network error reaching /api/study-assistant:', err);
+      const fallback = await generateFallbackAIResponse(cleanPrompt, selectedUnit, assistantMode);
+      replyText = `⚠️ **Network Connection Notice**: Could not connect to \`/api/study-assistant\` (${err?.message || 'Network request failed'}).\n\n*If this site was just deployed, the container may still be starting up or the domain may be proxying through an external CDN. Retrying in a few moments often resolves this.*\n\n---\n${fallback}`;
     } finally {
       const assistantMsg: Message = {
         id: `ast-${Date.now()}`,
@@ -312,16 +365,46 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-sm text-white">NursePrep AI Assistant</h3>
-              <span className="flex items-center gap-1 text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Active
-              </span>
+              {backendStatus.status === 'ready' && (
+                <span className="flex items-center gap-1 text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Online (Gemini 3.1)
+                </span>
+              )}
+              {backendStatus.status === 'unconfigured' && (
+                <span className="flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-semibold">
+                  <AlertCircle className="w-3 h-3" />
+                  API Key Needed
+                </span>
+              )}
+              {backendStatus.status === 'offline' && (
+                <span className="flex items-center gap-1 text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-full font-semibold">
+                  <AlertCircle className="w-3 h-3" />
+                  Backend Offline
+                </span>
+              )}
+              {backendStatus.status === 'checking' && (
+                <span className="flex items-center gap-1 text-[10px] bg-slate-500/10 text-slate-400 border border-slate-500/20 px-2 py-0.5 rounded-full font-semibold">
+                  <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                  Checking API...
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-400">NCLEX Clinical Judgment Tutor</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <button 
+            onClick={() => checkBackendStatus(true)} 
+            disabled={isTestingProbe}
+            title="Test AI API Connection"
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-xs flex items-center gap-1"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isTestingProbe ? 'animate-spin text-emerald-400' : ''}`} />
+            <span className="hidden sm:inline">{isTestingProbe ? 'Testing...' : 'Test AI'}</span>
+          </button>
+
           <button 
             onClick={handleReset} 
             title="Reset Chat Session"
@@ -342,6 +425,43 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
           )}
         </div>
       </div>
+
+      {/* Backend Status Advisory Banner (if unconfigured or offline) */}
+      {backendStatus.status === 'unconfigured' && (
+        <div className="bg-amber-950/70 border-b border-amber-600/40 px-3 py-2 text-xs text-amber-200 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>GEMINI_API_KEY</strong> is missing from this deployed server. Add it in <strong>Settings &gt; Secrets</strong> in Google AI Studio and click <strong>Deploy</strong>.
+            </span>
+          </div>
+          <button
+            onClick={() => checkBackendStatus(true)}
+            disabled={isTestingProbe}
+            className="text-[11px] bg-amber-600 hover:bg-amber-500 text-white font-medium px-2 py-1 rounded transition-colors shrink-0"
+          >
+            {isTestingProbe ? 'Checking...' : 'Recheck'}
+          </button>
+        </div>
+      )}
+
+      {backendStatus.status === 'offline' && (
+        <div className="bg-rose-950/60 border-b border-rose-600/40 px-3 py-2 text-xs text-rose-200 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>
+              Cannot connect to <code>/api/ai-status</code>. If deployed on a static host (Vercel/Netlify/Firebase), full-stack Node features require Google Cloud Run.
+            </span>
+          </div>
+          <button
+            onClick={() => checkBackendStatus(true)}
+            disabled={isTestingProbe}
+            className="text-[11px] bg-rose-600 hover:bg-rose-500 text-white font-medium px-2 py-1 rounded transition-colors shrink-0"
+          >
+            {isTestingProbe ? 'Retrying...' : 'Retry'}
+          </button>
+        </div>
+      )}
 
       {/* Mode & Domain Controls Bar */}
       <div className="bg-slate-900/90 px-3 py-2 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 shrink-0 text-xs">
