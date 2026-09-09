@@ -660,9 +660,9 @@ export default function MyCourses() {
                       </Button>
                       <Button 
                         variant="outline"
-                        onClick={() => navigate('/dashboard/assistant')}
-                        title="Study Assistant"
-                        className="text-blue-700 border-blue-200 hover:bg-blue-50 text-xs px-2.5"
+                        onClick={() => navigate('/dashboard/library')}
+                        title="Clinical Bookshelf & Reference Library"
+                        className="text-amber-800 border-amber-300 hover:bg-amber-50 text-xs px-2.5"
                       >
                         <BookOpen className="w-3.5 h-3.5" />
                       </Button>

@@ -26,6 +26,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 
 import QuizGeneratorPage from './pages/QuizGeneratorPage';
 import StudyAssistantPage from './pages/StudyAssistantPage';
+import ClinicalLibraryPage from './pages/ClinicalLibraryPage';
 import MyCourses from './pages/MyCourses';
 import PerformancePage from './pages/PerformancePage';
 import ScalabilityDashboard from './pages/ScalabilityDashboard';
@@ -122,7 +123,8 @@ export default function App() {
           }
         >
           <Route index element={<StudentDashboard />} />
-          <Route path="assistant" element={<StudyAssistantPage />} />
+          <Route path="library" element={<ClinicalLibraryPage />} />
+          <Route path="assistant" element={<ClinicalLibraryPage />} />
           <Route path="exams" element={<ExamBank />} />
           <Route path="generator" element={<QuizGeneratorPage />} />
           <Route path="courses" element={<MyCourses />} />

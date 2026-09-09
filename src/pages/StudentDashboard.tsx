@@ -18,14 +18,14 @@ import {
   ChevronRight, 
   ShieldCheck,
   BarChart2,
-  ArrowRight
+  ArrowRight,
+  Library
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { NURSING_UNITS } from '@/data/quizQuestions';
 
-import { StudyAssistant } from '@/components/StudyAssistant';
 import { 
   fetchBadgeConfigs, 
   calculateUserStreak, 
@@ -399,25 +399,25 @@ export default function StudentDashboard() {
 
       </div>
 
-      {/* Clinical Study Assistant Quick Launcher Banner */}
-      <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-white shadow-md">
+      {/* Clinical Bookshelf & Google Search Quick Launcher Banner */}
+      <div className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 rounded-2xl border border-amber-500/30 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-white shadow-md">
         <div className="flex items-start gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-            <BookOpen className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-sm font-bold">
+            <Library className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-white text-sm">Need Clinical Rationale & Saunders Study Mentoring?</h3>
+            <h3 className="font-bold text-white text-sm">Clinical Bookshelf & Google Search Desk</h3>
             <p className="text-xs text-slate-300 mt-0.5">
-              Access clinical study assistant for memory mnemonics, NCLEX pharmacology breakdowns, and Saunders flashcards.
+              Explore authentic Saunders, Davis's Drug Guide, and Brunner nursing textbooks on our interactive wooden bookshelf, with integrated Google Search for instant NCLEX rationales.
             </p>
           </div>
         </div>
 
         <Button
-          onClick={() => navigate('/dashboard/assistant')}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 shadow-xs"
+          onClick={() => navigate('/dashboard/library')}
+          className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-4 py-2 rounded-xl shrink-0 shadow-sm transition-all"
         >
-          Launch Study Assistant
+          Open Bookshelf
         </Button>
       </div>
     </div>
