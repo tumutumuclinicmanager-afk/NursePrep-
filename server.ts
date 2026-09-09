@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import multer from "multer";
 import * as pdfParseModule from "pdf-parse";
 import { GoogleGenAI } from "@google/genai";
@@ -14,20 +13,18 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } 
 });
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+export const app = express();
 
-  // Trust reverse proxy headers (e.g. Cloud Run / Nginx)
-  app.set("trust proxy", 1);
+// Trust reverse proxy headers (e.g. Cloud Run / Nginx / Vercel)
+app.set("trust proxy", 1);
 
-  // Security headers middleware with adjusted contentSecurityPolicy for Vite preview
-  app.use(
-    helmet({
-      contentSecurityPolicy: false,
-      crossOriginEmbedderPolicy: false,
-    })
-  );
+// Security headers middleware with adjusted contentSecurityPolicy for Vite preview
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
 
   // CORS & Preflight handling for deployed sites and cross-origin proxies
   app.use((req, res, next) => {
@@ -190,7 +187,7 @@ async function startServer() {
   });
 
   // Dedicated Test Endpoint to demonstrate rate limiting in real-time (supports GET and POST)
-  app.all("/api/test-rate-limit", testLimiter, (req, res) => {
+  app.all(["/api/test-rate-limit", "/test-rate-limit"], testLimiter, (req, res) => {
     res.json({
       success: true,
       message: "Request allowed by rate limiter probe.",
@@ -200,7 +197,7 @@ async function startServer() {
   });
 
   // Rate Limiting Status / Health Endpoint
-  app.get("/api/rate-limit-status", (req, res) => {
+  app.get(["/api/rate-limit-status", "/rate-limit-status"], (req, res) => {
     const clientIp = req.ip || req.socket.remoteAddress || "127.0.0.1";
     const policiesList = Object.values(dynamicPolicies).map(p => ({
       ...p,
@@ -217,7 +214,7 @@ async function startServer() {
   });
 
   // Super Admin: Update Active Rate Limiting Policies
-  app.post("/api/admin/rate-limit-policies", (req, res) => {
+  app.post(["/api/admin/rate-limit-policies", "/admin/rate-limit-policies"], (req, res) => {
     try {
       const { policies, singlePolicy } = req.body;
 
@@ -273,7 +270,7 @@ async function startServer() {
   });
 
   // Super Admin: Reset Rate Limiting Policies to System Defaults
-  app.post("/api/admin/rate-limit-reset", (req, res) => {
+  app.post(["/api/admin/rate-limit-reset", "/admin/rate-limit-reset"], (req, res) => {
     try {
       dynamicPolicies = JSON.parse(JSON.stringify(defaultPolicies));
       const updatedList = Object.values(dynamicPolicies).map(p => ({
@@ -294,7 +291,7 @@ async function startServer() {
   app.use("/api/", apiLimiter);
 
   // AI Quiz Generator Endpoint
-  app.post("/api/generate-quiz", aiLimiter, async (req, res) => {
+  app.post(["/api/generate-quiz", "/generate-quiz"], aiLimiter, async (req, res) => {
     try {
       const { topic, difficulty, count } = req.body;
       
@@ -409,7 +406,7 @@ async function startServer() {
   };
 
   // AI Diagnostic & Health Check Endpoint
-  app.get("/api/ai-status", async (req, res) => {
+  app.get(["/api/ai-status", "/ai-status"], async (req, res) => {
     const rawKey = cleanApiKey(process.env.GEMINI_API_KEY);
     const isConfigured = isValidApiKey(rawKey);
     const keyPreview = isConfigured && rawKey 
@@ -449,7 +446,7 @@ async function startServer() {
   });
 
   // AI Study Assistant Endpoint
-  app.post("/api/study-assistant", aiLimiter, async (req, res) => {
+  app.post(["/api/study-assistant", "/study-assistant"], aiLimiter, async (req, res) => {
     try {
       const { message, history, unit, mode } = req.body;
 
@@ -585,7 +582,7 @@ Key guidelines:
   });
 
   // PDF Import / Quiz Mixing
-  app.post("/api/upload-exam", uploadLimiter, (req, res, next) => {
+  app.post(["/api/upload-exam", "/upload-exam"], uploadLimiter, (req, res, next) => {
     upload.single("pdf")(req, res, (err: any) => {
       if (err) {
         console.error("Multer upload error:", err);
@@ -835,7 +832,7 @@ Key guidelines:
   });
 
   // Mock M-Pesa Payment
-  app.post("/api/payment/stkpush", paymentLimiter, async (req, res) => {
+  app.post(["/api/payment/stkpush", "/payment/stkpush"], paymentLimiter, async (req, res) => {
     const { phone, amount } = req.body;
     
     if (!phone || typeof phone !== "string" || !/^\+?[0-9]{9,15}$/.test(phone.trim())) {
@@ -868,8 +865,12 @@ Key guidelines:
     });
   });
 
+export async function startServer() {
+  const PORT = 3000;
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -896,6 +897,12 @@ Key guidelines:
   });
 }
 
-startServer().catch((err) => {
-  console.error("Failed to start server:", err);
-});
+// In serverless environments like Vercel, the exported app is handled by the serverless bridge.
+// In standalone environments (AI Studio dev or Cloud Run), we start the HTTP server.
+if (!process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error("Failed to start server:", err);
+  });
+}
+
+export default app;
