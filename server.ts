@@ -392,12 +392,20 @@ async function startServer() {
     }
   });
 
+  const isValidApiKey = (key?: string): boolean => {
+    if (!key) return false;
+    const trimmed = key.trim();
+    if (!trimmed || trimmed.length < 10) return false;
+    if (trimmed === "MY_GEMINI_API_KEY" || trimmed === "dummy_key" || trimmed === "undefined" || trimmed === "null") return false;
+    return true;
+  };
+
   // AI Diagnostic & Health Check Endpoint
   app.get("/api/ai-status", async (req, res) => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    const isConfigured = Boolean(apiKey && apiKey.trim().length > 0);
-    const keyPreview = isConfigured && apiKey 
-      ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` 
+    const rawKey = process.env.GEMINI_API_KEY;
+    const isConfigured = isValidApiKey(rawKey);
+    const keyPreview = isConfigured && rawKey 
+      ? `${rawKey.substring(0, 4)}...${rawKey.substring(rawKey.length - 4)}` 
       : null;
 
     let probeSuccess: boolean | null = null;
@@ -406,7 +414,7 @@ async function startServer() {
     if (req.query.probe === "true" && isConfigured) {
       try {
         const ai = new GoogleGenAI({
-          apiKey: apiKey!,
+          apiKey: rawKey!,
           httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
         });
         const testRes = await ai.models.generateContent({
@@ -447,17 +455,17 @@ async function startServer() {
         return;
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey || apiKey.trim() === "") {
-        console.warn("GEMINI_API_KEY is missing from server environment variables.");
+      const rawKey = process.env.GEMINI_API_KEY;
+      if (!isValidApiKey(rawKey)) {
+        console.warn("GEMINI_API_KEY is missing or invalid in server environment variables.");
         res.json({
-          reply: `### ⚠️ Configuration Required: GEMINI_API_KEY Missing\n\nThe server received your study query (*"${message.substring(0, 80)}"*), but the **GEMINI_API_KEY** environment variable is not configured on this deployed container.\n\n**To enable live AI study tutoring:**\n1. Open your project in Google AI Studio or your Cloud Run container settings.\n2. In the left or top menu, open **Settings > Secrets**.\n3. Add \`GEMINI_API_KEY\` with your Gemini API Key.\n4. Click **Deploy** to re-deploy the updated container.\n\n---\n*In the meantime, local NCLEX clinical guides and offline question rationales remain accessible.*`
+          reply: `### ⚠️ Configuration Required: GEMINI_API_KEY Missing\n\nThe server received your study query (*"${message.substring(0, 80)}"*), but the **GEMINI_API_KEY** environment variable is not configured on this deployed container.\n\n**To enable live AI study tutoring:**\n1. Open your project in Google AI Studio.\n2. In the top-right menu, open **Settings** (gear icon) > **Secrets**.\n3. Enter your Gemini API Key for \`GEMINI_API_KEY\`.\n4. Click **Deploy** to update your live deployment.\n\n---\n*In the meantime, offline NCLEX question rationales and clinical reference cards remain active.*`
         });
         return;
       }
 
       const ai = new GoogleGenAI({
-        apiKey,
+        apiKey: rawKey!,
         httpOptions: {
           headers: {
             'User-Agent': 'aistudio-build',
