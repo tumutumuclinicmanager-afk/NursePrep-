@@ -50,7 +50,7 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const checkBackendStatus = async (probe = false) => {
+  const checkBackendStatus = async (probe = false, retryCount = 0) => {
     if (probe) setIsTestingProbe(true);
     try {
       const res = await fetch(`/api/ai-status?probe=${probe ? 'true' : 'false'}`);
@@ -69,6 +69,7 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
               }
             ]);
           }
+          return;
         } else if (!data.keyConfigured) {
           setBackendStatus({ status: 'unconfigured', keyConfigured: false, probeMessage: 'GEMINI_API_KEY environment variable is not configured.' });
           if (probe) {
@@ -82,6 +83,7 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
               }
             ]);
           }
+          return;
         } else {
           const failMsg = data.probeMessage || 'Model probe failed';
           setBackendStatus({ status: 'offline', probeMessage: failMsg });
@@ -96,8 +98,16 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
               }
             ]);
           }
+          return;
         }
       } else {
+        // Cold start or server starting: automatically retry up to 2 times
+        if (retryCount < 2 && !probe) {
+          setTimeout(() => {
+            checkBackendStatus(false, retryCount + 1);
+          }, 2500);
+          return;
+        }
         const failMsg = `HTTP ${res.status} from /api/ai-status`;
         setBackendStatus({ status: 'offline', probeMessage: failMsg });
         if (probe) {
@@ -113,6 +123,13 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
         }
       }
     } catch (e: any) {
+      // Network failure or cold boot: automatically retry up to 2 times
+      if (retryCount < 2 && !probe) {
+        setTimeout(() => {
+          checkBackendStatus(false, retryCount + 1);
+        }, 2500);
+        return;
+      }
       const failMsg = e?.message || 'Cannot reach API';
       setBackendStatus({ status: 'offline', probeMessage: failMsg });
       if (probe) {
@@ -504,23 +521,23 @@ export function StudyAssistant({ mode = 'compact', initialUnit = 'All', onExpand
       )}
 
       {backendStatus.status === 'offline' && (
-        <div className="bg-rose-950/60 border-b border-rose-600/40 px-3 py-2 text-xs text-rose-200 flex items-center justify-between gap-2">
+        <div className="bg-slate-900/90 border-b border-indigo-500/30 px-3 py-2 text-xs text-slate-300 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-indigo-400 shrink-0" />
             <span>
-              {backendStatus.probeMessage ? (
-                <>Connection Note: <code>{backendStatus.probeMessage}</code>. Click "Test AI" to diagnose.</>
+              {backendStatus.probeMessage?.includes('blocked') || backendStatus.probeMessage?.includes('API_KEY') ? (
+                <>Gemini key status: <code>{backendStatus.probeMessage}</code>. Verify GEMINI_API_KEY in Settings &gt; Secrets.</>
               ) : (
-                <>Cannot connect to <code>/api/ai-status</code>. Full-stack Node features require Google Cloud Run deployment.</>
+                <>AI Server: {backendStatus.probeMessage || 'Reconnecting...'}. Offline Saunders NCLEX Clinical Guide is active.</>
               )}
             </span>
           </div>
           <button
             onClick={() => checkBackendStatus(true)}
             disabled={isTestingProbe}
-            className="text-[11px] bg-rose-600 hover:bg-rose-500 text-white font-medium px-2 py-1 rounded transition-colors shrink-0"
+            className="text-[11px] bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-2 py-1 rounded transition-colors shrink-0"
           >
-            {isTestingProbe ? 'Retrying...' : 'Retry'}
+            {isTestingProbe ? 'Checking...' : 'Check Connection'}
           </button>
         </div>
       )}
