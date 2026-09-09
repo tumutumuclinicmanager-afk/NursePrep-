@@ -139,12 +139,40 @@
         "name": { "type": "string", "description": "Category name" }
       },
       "required": ["name"]
+    },
+    "LibraryResource": {
+      "title": "LibraryResource",
+      "description": "Textbooks, downloadable PDFs, and PowerPoint slide decks managed by admin",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 300, "description": "Resource title" },
+        "subtitle": { "type": "string", "maxLength": 300, "description": "Resource subtitle" },
+        "author": { "type": "string", "maxLength": 200, "description": "Author, professor, or publisher name" },
+        "edition": { "type": "string", "maxLength": 100, "description": "Edition or publication version" },
+        "category": { "type": "string", "description": "Clinical category" },
+        "resourceType": { "type": "string", "enum": ["book", "pdf", "powerpoint"], "description": "Type of resource" },
+        "fileUrl": { "type": "string", "description": "Direct download URL or data URI" },
+        "fileName": { "type": "string", "description": "File name for download e.g. lecture.pptx" },
+        "fileSize": { "type": "string", "description": "Formatted file size e.g. 4.8 MB" },
+        "pageCount": { "type": "number", "description": "Number of pages (if book/pdf)" },
+        "slideCount": { "type": "number", "description": "Number of presentation slides (if powerpoint)" },
+        "spineColor": { "type": "string", "description": "Tailwind color gradient for bookshelf spine" },
+        "summary": { "type": "string", "maxLength": 2000, "description": "Summary or syllabus description" },
+        "highYieldTopics": { "type": "array", "description": "Key study topics" },
+        "downloadCount": { "type": "number", "description": "Total times downloaded" },
+        "createdAt": { "type": "string", "description": "Creation ISO timestamp" }
+      },
+      "required": ["title", "category", "resourceType"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User accounts and permissions"
+    },
+    "/library_resources/{resourceId}": {
+      "schema": { "$ref": "#/entities/LibraryResource" },
+      "description": "Repository of books, downloadable PDFs, and PowerPoint presentations"
     },
     "/exams/{examId}": {
       "schema": { "$ref": "#/entities/Exam" },

@@ -93,6 +93,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    // Clinical Bookshelf Library (Books, Downloadable PDFs, and PowerPoint Presentations)
+    match /library_resources/{resourceId} {
+      allow read, write: if true;
+    }
+
     // Default fallback deny rule
     match /{document=**} {
       allow read, write: if false;
