@@ -10,20 +10,92 @@ export interface ExtractedExamQuestion {
 }
 
 /**
+ * Detects whether a string is unparsed raw PDF binary bytecode
+ * (e.g. object tokens like /StructElem, /Pg 16 0 R, endobj, obj, /Type)
+ */
+export function isRawPdfBytecode(str: string): boolean {
+  if (!str || typeof str !== 'string') return true;
+  const bytecodeMarkers = [
+    /\/StructElem/i,
+    /\/Type\s*\/[A-Za-z]+/i,
+    /\bendobj\b/i,
+    /\b\d+\s+\d+\s+obj\b/i,
+    /\/Pg\s+\d+\s+\d+\s+R/i,
+    /\/MediaBox/i,
+    /\/Contents\s+\d+\s+\d+\s+R/i,
+    /\/FlateDecode/i,
+    /\/Parent\s+\d+\s+\d+\s+R/i,
+    /\bstartxref\b/i,
+    /\btrailer\b/i,
+  ];
+
+  let markerHits = 0;
+  for (const marker of bytecodeMarkers) {
+    if (marker.test(str)) {
+      markerHits++;
+    }
+  }
+  if (markerHits >= 2) return true;
+
+  // Check ratio of PDF slash tokens (/S /P /Type /StructElem /K /P)
+  const slashMatches = str.match(/\/[A-Za-z0-9]+/g) || [];
+  const totalWords = str.split(/\s+/).filter(Boolean).length;
+  if (slashMatches.length >= 6 && slashMatches.length / Math.max(1, totalWords) > 0.12) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Extracts plain text strings from a PDF ArrayBuffer directly in the browser
  */
-export function extractTextFromPdfArrayBuffer(arrayBuffer: ArrayBuffer): string {
+export async function extractTextFromPdfArrayBuffer(arrayBuffer: ArrayBuffer): Promise<string> {
+  // Step 1: Use legacy pdfjs-dist engine (works without external worker)
+  try {
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(arrayBuffer),
+      useSystemFonts: true,
+      disableFontFace: true,
+      isEvalSupported: false,
+    });
+    const doc = await loadingTask.promise;
+    let fullText = '';
+    const maxPages = Math.min(doc.numPages, 40);
+    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+      const page = await doc.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageStrings = textContent.items
+        .map((item: any) => (item && typeof item.str === 'string' ? item.str : ''))
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      if (pageStrings.length > 0) {
+        fullText += `\n--- Page ${pageNum} ---\n` + pageStrings;
+      }
+      page.cleanup();
+    }
+    const clean = fullText.trim();
+    if (clean.length > 25 && !isRawPdfBytecode(clean)) {
+      return clean;
+    }
+  } catch (pdfErr) {
+    console.warn('Browser pdfjs-dist extraction notice:', pdfErr);
+  }
+
+  // Step 2: Extract Tj/TJ string operators from uncompressed stream data
   try {
     const bytes = new Uint8Array(arrayBuffer);
     let binary = '';
     const chunk = 10000;
-    for (let i = 0; i < bytes.length; i += chunk) {
+    for (let i = 0; i < Math.min(bytes.length, 500000); i += chunk) {
       binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
     }
 
     const textPieces: string[] = [];
 
-    // 1. Match Tj string operators: (Some text) Tj
+    // Match Tj string operators
     const tjRegex = /\(((?:\\\(|\\\)|[^()])*)\)\s*Tj/g;
     let match: RegExpExecArray | null;
     while ((match = tjRegex.exec(binary)) !== null) {
@@ -32,12 +104,12 @@ export function extractTextFromPdfArrayBuffer(arrayBuffer: ArrayBuffer): string 
         .replace(/\\r/g, '\n')
         .replace(/\\n/g, '\n')
         .trim();
-      if (decoded.length > 0) {
+      if (decoded.length > 0 && !isRawPdfBytecode(decoded)) {
         textPieces.push(decoded);
       }
     }
 
-    // 2. Match TJ array operators: [(Part 1) 10 (Part 2)] TJ
+    // Match TJ array operators
     const tjArrayRegex = /\[(.*?)\]\s*TJ/g;
     while ((match = tjArrayRegex.exec(binary)) !== null) {
       const inner = match[1];
@@ -47,44 +119,29 @@ export function extractTextFromPdfArrayBuffer(arrayBuffer: ArrayBuffer): string 
           .map(m => m.slice(1, -1).replace(/\\([()\\])/g, '$1'))
           .join(' ')
           .trim();
-        if (line.length > 0) {
+        if (line.length > 0 && !isRawPdfBytecode(line)) {
           textPieces.push(line);
         }
       }
     }
 
-    // 3. Fallback: Search for printable ASCII text runs if Tj/TJ not found or too short
-    if (textPieces.length < 5) {
-      const asciiRegex = /[A-Za-z0-9\s.,?!;:()'"\-_/]{8,}/g;
-      const asciiMatches = binary.match(asciiRegex);
-      if (asciiMatches && asciiMatches.length > 0) {
-        // Filter out common PDF internal keywords
-        const filtered = asciiMatches.filter(s => 
-          !s.includes('Font') && 
-          !s.includes('Catalog') && 
-          !s.includes('MediaBox') && 
-          !s.includes('Length') && 
-          !s.includes('Filter') &&
-          !s.includes('FlateDecode')
-        );
-        if (filtered.length > textPieces.length) {
-          return filtered.join('\n');
-        }
-      }
+    const candidate = textPieces.join('\n').trim();
+    if (candidate.length > 30 && !isRawPdfBytecode(candidate)) {
+      return candidate;
     }
-
-    return textPieces.join('\n');
   } catch (err) {
     console.error('Error extracting text from PDF ArrayBuffer:', err);
-    return '';
   }
+
+  // Return empty string; NEVER return raw PDF bytecode
+  return '';
 }
 
 /**
  * Intelligent parser that converts raw exam text into structured NCLEX questions
  */
 export function parseExamQuestionsFromText(rawText: string, defaultFileName: string = 'Uploaded Exam'): ExtractedExamQuestion[] {
-  if (!rawText || typeof rawText !== 'string') {
+  if (!rawText || typeof rawText !== 'string' || isRawPdfBytecode(rawText)) {
     return createFallbackQuestions(defaultFileName);
   }
 
@@ -103,7 +160,7 @@ export function parseExamQuestionsFromText(rawText: string, defaultFileName: str
       const startIdx = matches[i].index ?? 0;
       const endIdx = i + 1 < matches.length ? (matches[i + 1].index ?? clean.length) : clean.length;
       const block = clean.substring(startIdx, endIdx).trim();
-      if (block.length > 10) {
+      if (block.length > 15 && !isRawPdfBytecode(block)) {
         questionBlocks.push({
           num: matches[i][1] || matches[i][2] || String(i + 1),
           text: block
@@ -112,7 +169,7 @@ export function parseExamQuestionsFromText(rawText: string, defaultFileName: str
     }
   } else {
     // If no numbered pattern, split by double newlines or question marks
-    const blocks = clean.split(/\n\s*\n/).filter(b => b.trim().length > 25);
+    const blocks = clean.split(/\n\s*\n/).filter(b => b.trim().length > 30 && !isRawPdfBytecode(b));
     for (let i = 0; i < blocks.length; i++) {
       questionBlocks.push({
         num: String(i + 1),
@@ -129,6 +186,9 @@ export function parseExamQuestionsFromText(rawText: string, defaultFileName: str
 
   for (const qBlock of questionBlocks) {
     let block = qBlock.text;
+
+    // Reject any block with raw PDF tokens
+    if (isRawPdfBytecode(block)) continue;
 
     // Clean leading question numbering
     block = block.replace(/^(?:(?:Question|Q\.?|Item)\s*\d+[\.:\-]?\s*|\d+[\.\)]\s*)/i, '').trim();
@@ -167,7 +227,7 @@ export function parseExamQuestionsFromText(rawText: string, defaultFileName: str
       });
     } else {
       // Inline options check: A. text B. text C. text D. text
-      const inlineRegex = /(?:^|\s+)([A-D])[\.\)]\s*(.*?)(?=\s+[A-D][\.\)]|$)/g;
+      const inlineRegex = /(?:^|\s+)([A-Ea-e])[\.\)]\s*(.*?)(?=\s+[A-Ea-e][\.\)]|\s+(?:Answer|Ans|Rationale|Explanation|Key)|$)/gi;
       const inlineMatches = [...block.matchAll(inlineRegex)];
       if (inlineMatches.length >= 2) {
         stem = block.substring(0, inlineMatches[0].index ?? block.length).trim();
@@ -199,10 +259,9 @@ export function parseExamQuestionsFromText(rawText: string, defaultFileName: str
     }
 
     if (!explanation) {
-      explanation = `Clinical principle from ${defaultFileName}: Prioritize acute patient assessment, airway breathing circulation (ABCs), and safe clinical judgment.`;
+      explanation = `Clinical assessment priority. Assess client status, ABCs (Airway, Breathing, Circulation), and ensure patient safety.`;
     }
 
-    // Determine Question Type
     const lowerStem = stem.toLowerCase();
     let questionTypeId = 'single_choice';
     let questionTypeLabel = 'Single Choice';
@@ -213,25 +272,15 @@ export function parseExamQuestionsFromText(rawText: string, defaultFileName: str
     } else if (finalOptions.length === 2 && (finalOptions.some(o => o.toLowerCase() === 'true') || finalOptions.some(o => o.toLowerCase() === 'false'))) {
       questionTypeId = 'true_false';
       questionTypeLabel = 'True / False';
-    } else if (lowerStem.includes('calculate') || lowerStem.includes('ml/hr') || lowerStem.includes('mg/kg') || lowerStem.includes('drop rate')) {
+    } else if (lowerStem.includes('calculate') || lowerStem.includes('ml/hr') || lowerStem.includes('mg/kg')) {
       questionTypeId = 'numeric';
       questionTypeLabel = 'Numeric Calculation';
-    } else if (lowerStem.includes('bowtie') || lowerStem.includes('condition most likely') || lowerStem.includes('two actions')) {
-      questionTypeId = 'sieve_bowtie';
-      questionTypeLabel = 'Bowtie Question';
-    } else if (lowerStem.includes('order') || lowerStem.includes('sequence') || lowerStem.includes('first to last')) {
-      questionTypeId = 'order_numbers';
-      questionTypeLabel = 'Ordered Sequence';
     }
 
-    // Clean up question text
-    const cleanQuestion = stem
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    if (cleanQuestion.length >= 5) {
+    const cleanStem = stem.replace(/\s+/g, ' ').trim();
+    if (cleanStem.length >= 15 && !isRawPdfBytecode(cleanStem)) {
       results.push({
-        question: cleanQuestion,
+        question: cleanStem,
         questionTypeId,
         questionTypeLabel,
         options: finalOptions.slice(0, 5),
@@ -309,13 +358,13 @@ export async function extractExamQuestionsUniversal(file: File): Promise<{
   questions: ExtractedExamQuestion[];
   source: 'server' | 'client_pdf' | 'client_fallback';
 }> {
-  // Step 1: Try server extraction with 8-second timeout
+  // Step 1: Try server extraction with 30-second timeout
   try {
     const formData = new FormData();
     formData.append('pdf', file);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     const res = await fetch('/api/upload-exam', {
       method: 'POST',
@@ -326,25 +375,29 @@ export async function extractExamQuestionsUniversal(file: File): Promise<{
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.questions) && data.questions.length > 0) {
-        return {
-          questions: data.questions,
-          source: 'server'
-        };
+        const cleanServerQuestions = data.questions.filter((q: ExtractedExamQuestion) => !isRawPdfBytecode(q?.question));
+        if (cleanServerQuestions.length > 0) {
+          return {
+            questions: cleanServerQuestions,
+            source: 'server'
+          };
+        }
       }
     }
   } catch (serverErr: any) {
     console.warn('Server-side PDF extraction endpoint unavailable or timed out, executing client-side extraction engine:', serverErr?.message || serverErr);
   }
 
-  // Step 2: Client-side ArrayBuffer parsing
+  // Step 2: Client-side ArrayBuffer parsing with pdfjs
   try {
     const buffer = await file.arrayBuffer();
-    const extractedText = extractTextFromPdfArrayBuffer(buffer);
-    if (extractedText && extractedText.trim().length > 20) {
+    const extractedText = await extractTextFromPdfArrayBuffer(buffer);
+    if (extractedText && extractedText.trim().length > 20 && !isRawPdfBytecode(extractedText)) {
       const parsed = parseExamQuestionsFromText(extractedText, file.name);
-      if (parsed.length > 0) {
+      const cleanClientQuestions = parsed.filter(q => !isRawPdfBytecode(q.question));
+      if (cleanClientQuestions.length > 0) {
         return {
-          questions: parsed,
+          questions: cleanClientQuestions,
           source: 'client_pdf'
         };
       }

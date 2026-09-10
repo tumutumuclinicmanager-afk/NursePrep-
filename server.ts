@@ -581,6 +581,96 @@ Key guidelines:
     }
   });
 
+  // Helper to detect raw unparsed PDF binary bytecode (e.g. /StructElem, endobj, obj, /Pg)
+  const isRawPdfBytecode = (str: string): boolean => {
+    if (!str || typeof str !== "string") return true;
+    const bytecodeMarkers = [
+      /\/StructElem/i,
+      /\/Type\s*\/[A-Za-z]+/i,
+      /\bendobj\b/i,
+      /\b\d+\s+\d+\s+obj\b/i,
+      /\/Pg\s+\d+\s+\d+\s+R/i,
+      /\/MediaBox/i,
+      /\/Contents\s+\d+\s+\d+\s+R/i,
+      /\/FlateDecode/i,
+      /\/Parent\s+\d+\s+\d+\s+R/i,
+      /\bstartxref\b/i,
+      /\btrailer\b/i,
+    ];
+
+    let markerHits = 0;
+    for (const marker of bytecodeMarkers) {
+      if (marker.test(str)) {
+        markerHits++;
+      }
+    }
+
+    if (markerHits >= 2) return true;
+
+    // Check ratio of PDF slash tokens (/S /P /Type /StructElem /K /P)
+    const slashMatches = str.match(/\/[A-Za-z0-9]+/g) || [];
+    const totalWords = str.split(/\s+/).filter(Boolean).length;
+    if (slashMatches.length >= 6 && slashMatches.length / Math.max(1, totalWords) > 0.12) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Dedicated PDF text extraction using Mozilla's pdfjs-dist legacy engine
+  const extractTextFromPdfBuffer = async (buffer: Buffer): Promise<string> => {
+    try {
+      const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      const loadingTask = pdfjs.getDocument({
+        data: new Uint8Array(buffer),
+        useSystemFonts: true,
+        disableFontFace: true,
+        isEvalSupported: false,
+      });
+
+      const doc = await loadingTask.promise;
+      let fullText = "";
+      const maxPages = Math.min(doc.numPages, 40);
+
+      for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+        const page = await doc.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageStrings = textContent.items
+          .map((item: any) => (item && typeof item.str === "string" ? item.str : ""))
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+
+        if (pageStrings.length > 0) {
+          fullText += `\n--- Page ${pageNum} ---\n` + pageStrings;
+        }
+        page.cleanup();
+      }
+
+      const clean = fullText.trim();
+      if (clean.length > 25 && !isRawPdfBytecode(clean)) {
+        return clean;
+      }
+    } catch (pdfErr: any) {
+      console.warn("pdfjs-dist extraction notice:", pdfErr?.message || pdfErr);
+    }
+
+    // Secondary fallback: Try pdf-parse if available
+    try {
+      const parseFunc = (pdfParseModule as any).default || pdfParseModule;
+      if (typeof parseFunc === "function") {
+        const parsed = await parseFunc(buffer);
+        if (parsed?.text && parsed.text.trim().length > 25 && !isRawPdfBytecode(parsed.text)) {
+          return parsed.text.trim();
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    return "";
+  };
+
   // PDF Import / Quiz Mixing
   app.post(["/api/upload-exam", "/upload-exam"], uploadLimiter, (req, res, next) => {
     upload.single("pdf")(req, res, (err: any) => {
@@ -597,50 +687,16 @@ Key guidelines:
         return;
       }
       
-      let text = "";
-      try {
-        const PDFParseClass = (pdfParseModule as any).PDFParse || (pdfParseModule as any).default?.PDFParse;
-        if (typeof PDFParseClass === 'function') {
-          const pdf = new PDFParseClass({ data: req.file.buffer });
-          const textResult = await pdf.getText();
-          text = textResult.text || "";
-        } else {
-          const parseFunc = (pdfParseModule as any).default || pdfParseModule;
-          if (typeof parseFunc === 'function') {
-            const data = await parseFunc(req.file.buffer);
-            text = data.text || "";
-          } else {
-            text = req.file.buffer.toString('utf-8');
-          }
-        }
-      } catch (parseErr) {
-        console.error("Error parsing PDF buffer:", parseErr);
-        try {
-          const bufferStr = req.file.buffer.toString('latin1');
-          const tjRegex = /\(((?:\\\(|\\\)|[^()])*)\)\s*Tj/g;
-          const pieces: string[] = [];
-          let tjMatch: RegExpExecArray | null;
-          while ((tjMatch = tjRegex.exec(bufferStr)) !== null) {
-            pieces.push(tjMatch[1].replace(/\\([()\\])/g, '$1').trim());
-          }
-          if (pieces.length > 5) {
-            text = pieces.join('\n');
-          } else {
-            const matches = bufferStr.match(/[A-Za-z0-9\s.,?!;:()\-_]{6,}/g);
-            text = matches ? matches.join(' ') : req.file.buffer.toString('utf-8');
-          }
-        } catch (e) {
-          text = req.file.buffer.toString('utf-8');
-        }
-      }
-      
+      const fileName = req.file.originalname || "Exam.pdf";
       const apiKey = process.env.GEMINI_API_KEY;
       let questions: any[] = [];
-      const fileName = req.file.originalname || "Exam.pdf";
 
-      // Robust regex parser to extract structured questions from text
+      // Extract real text using pdfjs-dist
+      let text = await extractTextFromPdfBuffer(req.file.buffer);
+
+      // Robust regex parser to extract structured questions from genuine human text
       const robustRegexExtract = (rawText: string) => {
-        if (!rawText || rawText.trim().length < 10) return [];
+        if (!rawText || rawText.trim().length < 15 || isRawPdfBytecode(rawText)) return [];
         const clean = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         const qPattern = /(?:(?:Question|Q\.?|Item)\s*(\d+)[\.:\-]?\s*|(?:\n|^)\s*(\d+)[\.\)]\s+)/gi;
         const matches = [...clean.matchAll(qPattern)];
@@ -651,7 +707,7 @@ Key guidelines:
             const startIdx = matches[i].index ?? 0;
             const endIdx = i + 1 < matches.length ? (matches[i + 1].index ?? clean.length) : clean.length;
             const block = clean.substring(startIdx, endIdx).trim();
-            if (block.length > 10) {
+            if (block.length > 15 && !isRawPdfBytecode(block)) {
               questionBlocks.push({
                 num: matches[i][1] || matches[i][2] || String(i + 1),
                 text: block
@@ -659,7 +715,7 @@ Key guidelines:
             }
           }
         } else {
-          const blocks = clean.split(/\n\s*\n/).filter(b => b.trim().length > 25);
+          const blocks = clean.split(/\n\s*\n/).filter(b => b.trim().length > 30 && !isRawPdfBytecode(b));
           for (let i = 0; i < blocks.length; i++) {
             questionBlocks.push({
               num: String(i + 1),
@@ -672,6 +728,9 @@ Key guidelines:
         for (const qBlock of questionBlocks) {
           let block = qBlock.text;
           block = block.replace(/^(?:(?:Question|Q\.?|Item)\s*\d+[\.:\-]?\s*|\d+[\.\)]\s*)/i, '').trim();
+
+          // Reject any block contaminated with PDF binary markers
+          if (isRawPdfBytecode(block)) continue;
 
           let rawAnswer = '';
           const ansMatch = block.match(/(?:(?:Correct\s*)?Answer|Ans|Key)\s*[:\-]\s*([A-Ea-e1-5](?:\s*,\s*[A-Ea-e1-5])*|[^\n]+)/i);
@@ -701,7 +760,7 @@ Key guidelines:
               text: (m[3] || '').trim()
             }));
           } else {
-            const inlineRegex = /(?:^|\s+)([A-D])[\.\)]\s*(.*?)(?=\s+[A-D][\.\)]|$)/g;
+            const inlineRegex = /(?:^|\s+)([A-Ea-e])[\.\)]\s*(.*?)(?=\s+[A-Ea-e][\.\)]|\s+(?:Answer|Ans|Rationale|Explanation|Key)|$)/gi;
             const inlineMatches = [...block.matchAll(inlineRegex)];
             if (inlineMatches.length >= 2) {
               stem = block.substring(0, inlineMatches[0].index ?? block.length).trim();
@@ -731,7 +790,7 @@ Key guidelines:
           }
 
           if (!explanation) {
-            explanation = `Extracted from ${fileName}. Prioritize acute clinical assessment and ABCs.`;
+            explanation = `Extracted from ${fileName}. Prioritize clinical assessment, ABCs, and patient safety.`;
           }
 
           const lowerStem = stem.toLowerCase();
@@ -750,7 +809,7 @@ Key guidelines:
           }
 
           const cleanStem = stem.replace(/\s+/g, ' ').trim();
-          if (cleanStem.length >= 5) {
+          if (cleanStem.length >= 15 && !isRawPdfBytecode(cleanStem)) {
             extracted.push({
               question: cleanStem,
               questionTypeId,
@@ -766,8 +825,8 @@ Key guidelines:
         return extracted;
       };
 
-      // If text exists, optionally attempt AI with a strict 4-second timeout
-      if (apiKey && apiKey !== "dummy_key" && text.trim().length > 30) {
+      // Strategy 1: If Gemini API key is available, use Gemini 3.8 Flash
+      if (apiKey && apiKey !== "dummy_key") {
         try {
           const ai = new GoogleGenAI({
             apiKey: apiKey,
@@ -775,82 +834,150 @@ Key guidelines:
               headers: { 'User-Agent': 'aistudio-build' }
             }
           });
-          const prompt = `Extract nursing exam questions from this text. Return ONLY a JSON array of objects with fields: "question", "questionTypeId" ("single_choice"|"multiple_select"|"true_false"|"numeric"), "questionTypeLabel", "options" (array of strings), "correctAnswer", "explanation", "category", "difficulty". Text: ${text.substring(0, 40000)}`;
-          
+
+          // If we have clean text, pass text to Gemini
+          // If text was empty (e.g. scanned image PDF), pass multimodal PDF directly to Gemini
+          let contents: any;
+          if (text.length > 40) {
+            const prompt = `You are an expert NCLEX and nursing exam parser. Extract all nursing multiple-choice and multiple-select exam questions from this document text.
+Return ONLY a valid JSON array of question objects with this schema:
+[
+  {
+    "question": "string (the full clinical scenario/stem)",
+    "questionTypeId": "single_choice" | "multiple_select" | "true_false" | "numeric",
+    "questionTypeLabel": "Single Choice" | "Multiple Select (SATA)" | "True / False" | "Numeric Calculation",
+    "options": ["string", "string", "string", "string"],
+    "correctAnswer": "string (matching one of the options or correct answer text)",
+    "explanation": "string (clinical rationale explaining why this answer is correct)",
+    "category": "string (e.g. Pharmacology, Medical-Surgical, Pediatrics, Mental Health, Fundamentals)",
+    "difficulty": "Easy" | "Medium" | "Hard"
+  }
+]
+Do NOT include markdown formatting or commentary. Return ONLY the JSON array.
+Document Text:
+${text.substring(0, 45000)}`;
+
+            contents = prompt;
+          } else {
+            // Multimodal PDF upload directly to Gemini (handles scanned images and OCR)
+            contents = [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'application/pdf',
+                      data: req.file.buffer.toString('base64')
+                    }
+                  },
+                  {
+                    text: `Extract all nursing exam questions from this uploaded PDF document.
+Return ONLY a valid JSON array of question objects with fields:
+- question: full question text
+- questionTypeId: "single_choice" | "multiple_select" | "true_false" | "numeric"
+- questionTypeLabel: "Single Choice" | "Multiple Select (SATA)" | "True / False" | "Numeric Calculation"
+- options: array of 4-5 answer choice strings
+- correctAnswer: the correct choice
+- explanation: rationale
+- category: nursing category
+- difficulty: "Easy" | "Medium" | "Hard"
+
+If no questions exist in the document, return an empty array []. Output ONLY the JSON array.`
+                  }
+                ]
+              }
+            ];
+          }
+
           const aiPromise = ai.models.generateContent({
-            model: "gemini-3.8-flash",
-            contents: prompt,
+            model: "gemini-2.5-flash",
+            contents: contents,
             config: { responseMimeType: "application/json" }
           });
 
+          // 25 second timeout for multi-page document parsing
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("AI extraction timeout (4s limit)")), 4000)
+            setTimeout(() => reject(new Error("AI extraction timeout (25s limit)")), 25000)
           );
 
           const aiRes: any = await Promise.race([aiPromise, timeoutPromise]);
           const questionsText = aiRes?.text;
           const parsed = JSON.parse(questionsText || "[]");
           if (Array.isArray(parsed) && parsed.length > 0) {
-            questions = parsed;
+            // Filter out any potential hallucinations or bytecode
+            questions = parsed.filter((q: any) => 
+              q && 
+              typeof q.question === 'string' && 
+              q.question.length > 10 && 
+              !isRawPdfBytecode(q.question) &&
+              Array.isArray(q.options) &&
+              q.options.length >= 2
+            );
           }
         } catch (aiErr: any) {
-          console.warn("Fast AI extraction bypassed/failed, using robust regex engine:", aiErr?.message || aiErr);
+          console.warn("AI extraction notice (falling back to regex engine):", aiErr?.message || aiErr);
         }
       }
 
-      // If AI did not return questions or failed/timed out, run robust regex extraction
-      if (!Array.isArray(questions) || questions.length === 0) {
+      // Strategy 2: If AI was unavailable or returned no questions, run regex extraction on clean text
+      if ((!Array.isArray(questions) || questions.length === 0) && text.length > 20 && !isRawPdfBytecode(text)) {
         questions = robustRegexExtract(text);
       }
 
-      // Safe fallback questions if document had no text or was an empty/image PDF
+      // Final verification: Ensure questions don't contain PDF bytecode
+      if (Array.isArray(questions)) {
+        questions = questions.filter(q => !isRawPdfBytecode(q.question));
+      }
+
+      // If still no valid questions could be extracted
       if (!Array.isArray(questions) || questions.length === 0) {
-        const cleanName = fileName.replace(/\.pdf$/i, '');
+        // Provide standard NCLEX clinical questions for the named topic so educators have a starting blueprint
+        const cleanName = fileName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
         questions = [
           {
-            question: `Clinical Review Question 1 (${cleanName}): A nurse is assessing a client admitted with acute respiratory distress. Which assessment finding requires immediate nursing intervention?`,
+            question: `Clinical Review (${cleanName}): A nurse is assessing a client admitted with acute hypoxemic respiratory distress. Which assessment finding requires immediate nursing intervention?`,
             questionTypeId: "single_choice",
             questionTypeLabel: "Single Choice",
             options: [
-              "Sudden onset shortness of breath and oxygen saturation of 88%",
-              "Bilateral 1+ peripheral edema",
-              "Stable blood pressure of 120/80 mmHg",
-              "Regular heart rate of 78 beats per minute"
+              "Sudden onset dyspnea with arterial oxygen saturation (SpO2) of 86%",
+              "Bilateral 1+ non-pitting peripheral ankle edema",
+              "Blood pressure of 124/82 mmHg with warm skin",
+              "Regular apical pulse of 76 beats per minute"
             ],
-            correctAnswer: "Sudden onset shortness of breath and oxygen saturation of 88%",
-            explanation: `Extracted from ${fileName}. Acute hypoxemia requires immediate airway and breathing interventions.`,
+            correctAnswer: "Sudden onset dyspnea with arterial oxygen saturation (SpO2) of 86%",
+            explanation: `Based on NCLEX ABC prioritization, severe hypoxemia (SpO2 < 90%) is a life-threatening priority that requires immediate oxygen therapy and airway management.`,
             category: "Medical-Surgical",
             difficulty: "Medium"
           },
           {
-            question: `Clinical Review Question 2 (${cleanName}): Which priority nursing action is most critical when administering high-alert intravenous medications?`,
+            question: `Pharmacology Review (${cleanName}): A nurse is preparing to administer intravenous digoxin. Which clinical laboratory parameter must be verified prior to administration?`,
             questionTypeId: "single_choice",
             questionTypeLabel: "Single Choice",
             options: [
-              "Double-checking dosage calculations with a second licensed nurse",
-              "Administering the medication via gravity drip without pump",
-              "Documenting administration prior to infusion",
-              "Using the patient's room number for identification"
+              "Serum potassium level",
+              "Serum calcium level",
+              "Blood urea nitrogen (BUN)",
+              "Serum total cholesterol"
             ],
-            correctAnswer: "Double-checking dosage calculations with a second licensed nurse",
-            explanation: `Extracted from ${fileName}. Independent double checks prevent fatal medication errors.`,
+            correctAnswer: "Serum potassium level",
+            explanation: `Hypokalemia (< 3.5 mEq/L) significantly increases the risk of life-threatening digoxin toxicity and cardiac arrhythmias. Serum potassium must always be assessed prior to administration.`,
             category: "Pharmacology",
-            difficulty: "Medium"
+            difficulty: "Hard"
           },
           {
-            question: `Clinical Review Question 3 (${cleanName}): Applying the nursing process (ADPIE), what is the first step the nurse should take upon encountering an unresponsive client?`,
+            question: `Prioritization & Delegation (${cleanName}): Which client should the charge nurse assign to the most experienced registered nurse (RN)?`,
             questionTypeId: "single_choice",
             questionTypeLabel: "Single Choice",
             options: [
-              "Assessing responsiveness and safety of the scene",
-              "Diagnosing ineffective breathing pattern",
-              "Administering emergency medications",
-              "Documenting the time of discovery"
+              "A client 2 hours post-percutaneous coronary intervention (PCI) with new-onset chest heaviness",
+              "A stable client scheduled for hospital discharge instructions later today",
+              "A client with chronic COPD receiving 2 L/min oxygen via nasal cannula with stable vitals",
+              "A client requiring routine subcutaneous insulin administration before breakfast"
             ],
-            correctAnswer: "Assessing responsiveness and safety of the scene",
-            explanation: `Extracted from ${fileName}. Assessment (responsiveness & safety) must always precede nursing diagnoses or interventions.`,
-            category: "Fundamentals",
-            difficulty: "Medium"
+            correctAnswer: "A client 2 hours post-percutaneous coronary intervention (PCI) with new-onset chest heaviness",
+            explanation: `New or worsening chest heaviness post-PCI suggests acute re-occlusion or coronary artery spasm, requiring urgent evaluation by an experienced RN.`,
+            category: "Management of Care",
+            difficulty: "Hard"
           }
         ];
       }

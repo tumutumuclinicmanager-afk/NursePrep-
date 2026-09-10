@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { collection, addDoc, getDocs, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { parseRateLimitResponse } from '@/lib/rateLimit';
-import { extractExamQuestionsUniversal, parseExamQuestionsFromText, ExtractedExamQuestion } from '@/lib/pdfExtractor';
+import { extractExamQuestionsUniversal, parseExamQuestionsFromText, isRawPdfBytecode, ExtractedExamQuestion } from '@/lib/pdfExtractor';
 import QuestionBuilder from '@/components/staff/QuestionBuilder';
 import QuestionRepository from '@/components/staff/QuestionRepository';
 import ExamPublisher from '@/components/staff/ExamPublisher';
@@ -109,7 +109,8 @@ export default function UploadExams() {
 
     try {
       const result = await extractExamQuestionsUniversal(file);
-      setExtractedQuestions(result.questions);
+      const cleanQuestions = result.questions.filter(q => !isRawPdfBytecode(q.question));
+      setExtractedQuestions(cleanQuestions.length > 0 ? cleanQuestions : result.questions);
       setExtractionSource(result.source);
       setUploadStatus('success');
       
@@ -118,7 +119,7 @@ export default function UploadExams() {
       else if (result.source === 'client_pdf') sourceLabel = 'Client-Side PDF Engine';
       else sourceLabel = 'Direct Curriculum Parser';
       
-      setStatusMessage(`Successfully extracted ${result.questions.length} questions using ${sourceLabel}.`);
+      setStatusMessage(`Successfully extracted ${cleanQuestions.length || result.questions.length} questions using ${sourceLabel}.`);
     } catch (error: any) {
       console.error('Error uploading exam:', error);
       // Fallback extraction so educators are never blocked
