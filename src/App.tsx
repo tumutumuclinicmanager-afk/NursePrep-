@@ -30,6 +30,7 @@ import ClinicalLibraryPage from './pages/ClinicalLibraryPage';
 import MyCourses from './pages/MyCourses';
 import PerformancePage from './pages/PerformancePage';
 import ScalabilityDashboard from './pages/ScalabilityDashboard';
+import AdminLibraryResources from './pages/admin/AdminLibraryResources';
 import { SessionTimeoutManager } from './components/SessionTimeoutManager';
 
 function PlaceholderPage({ title }: { title: string }) {
@@ -142,6 +143,7 @@ export default function App() {
         >
           <Route index element={<Navigate to="/staff/upload" replace />} />
           <Route path="upload" element={<UploadExams />} />
+          <Route path="resources" element={<AdminLibraryResources />} />
           <Route path="sessions" element={<LiveSessions />} />
           <Route path="queries" element={<StudentQueries />} />
           <Route path="*" element={<PlaceholderPage title="Work in progress" />} />
@@ -159,6 +161,7 @@ export default function App() {
           <Route path="badges" element={<AdminBadges />} />
           <Route path="questions" element={<UploadExams />} />
           <Route path="upload" element={<UploadExams />} />
+          <Route path="resources" element={<AdminLibraryResources />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="payments" element={<Payments />} />
           <Route path="analytics" element={<Analytics />} />

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -14,8 +14,18 @@ import {
   FileText, 
   HelpCircle,
   Library,
-  BookMarked
+  BookMarked,
+  Presentation,
+  Download,
+  FolderPlus,
+  ArrowUpRight,
+  CheckCircle,
+  Tag
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { StoredLibraryResource } from '@/types/library';
 import { LIBRARY_BOOKS, POPULAR_GOOGLE_SEARCHES, LibraryBook, ChapterSummary } from '@/data/libraryBooks';
 
 export function BookshelfLibrary() {
@@ -26,9 +36,65 @@ export function BookshelfLibrary() {
   const [bookmarkedBookIds, setBookmarkedBookIds] = useState<string[]>(['saunders-nclex-9th']);
   const [activeChapterIndex, setActiveChapterIndex] = useState<number>(0);
 
+  // New State for Dynamic Admin-Added Resources & Active View
+  const [activeView, setActiveView] = useState<'bookshelf' | 'pdfs' | 'powerpoints'>('bookshelf');
+  const [customResources, setCustomResources] = useState<StoredLibraryResource[]>([]);
+  const [isLoadingResources, setIsLoadingResources] = useState<boolean>(true);
+  const [downloadSuccessNotice, setDownloadSuccessNotice] = useState<string | null>(null);
+
+  // Load custom resources from Firestore
+  useEffect(() => {
+    async function loadResources() {
+      try {
+        const snap = await getDocs(collection(db, 'library_resources'));
+        const items = snap.docs.map(d => ({ id: d.id, ...d.data() })) as StoredLibraryResource[];
+        setCustomResources(items);
+      } catch (err) {
+        console.warn('Could not load library_resources:', err);
+      } finally {
+        setIsLoadingResources(false);
+      }
+    }
+    loadResources();
+  }, []);
+
+  // Merge static LIBRARY_BOOKS with any admin-added resources of type 'book'
+  const allBooks = useMemo<LibraryBook[]>(() => {
+    const customBooks: LibraryBook[] = customResources
+      .filter(r => r.resourceType === 'book')
+      .map(r => ({
+        id: r.id || `custom-${r.title.toLowerCase().replace(/\s+/g, '-')}`,
+        title: r.title,
+        subtitle: r.subtitle || 'Clinical Nursing Textbook',
+        author: r.author || 'Clinical Faculty',
+        edition: r.edition || 'Current Edition',
+        category: (r.category as any) || 'Exam Prep',
+        spineColor: r.spineColor || 'from-indigo-950 via-slate-900 to-blue-950',
+        textColor: 'text-amber-300',
+        accentColor: '#3b82f6',
+        pages: r.pageCount || 450,
+        nclexYieldRating: 5,
+        isbn: 'NursePrep-CLINICAL',
+        summary: r.summary || 'Nursing clinical reference guide.',
+        highYieldTopics: r.highYieldTopics || ['Clinical Priorities', 'Patient Safety'],
+        chapters: [
+          {
+            chapterNumber: 1,
+            title: r.subtitle || 'Core Review & High-Yield Principles',
+            highYieldPoints: r.highYieldTopics?.length ? r.highYieldTopics : ['Priority Assessment & Intervention', 'Clinical Judgment Protocols'],
+            keyMnemonic: 'NCLEX Priority: Assess before intervening.',
+            googleSearchQuery: `${r.title} ${r.category} NCLEX review`
+          }
+        ],
+        googleBooksQuery: r.title
+      }));
+
+    return [...LIBRARY_BOOKS, ...customBooks];
+  }, [customResources]);
+
   // Filter books on the shelf
   const filteredBooks = useMemo(() => {
-    return LIBRARY_BOOKS.filter(book => {
+    return allBooks.filter(book => {
       const matchesCategory = selectedCategory === 'All' || book.category === selectedCategory;
       const q = searchQuery.toLowerCase().trim();
       if (!q) return matchesCategory;
@@ -41,7 +107,81 @@ export function BookshelfLibrary() {
 
       return matchesCategory && matchesSearch;
     });
-  }, [selectedCategory, searchQuery]);
+  }, [allBooks, selectedCategory, searchQuery]);
+
+  // Filtered PDFs
+  const filteredPdfs = useMemo(() => {
+    return customResources.filter(res => {
+      if (res.resourceType !== 'pdf') return false;
+      const matchesCategory = selectedCategory === 'All' || res.category === selectedCategory;
+      const q = searchQuery.toLowerCase().trim();
+      if (!q) return matchesCategory;
+
+      return matchesCategory && (
+        res.title.toLowerCase().includes(q) ||
+        (res.subtitle && res.subtitle.toLowerCase().includes(q)) ||
+        (res.summary && res.summary.toLowerCase().includes(q)) ||
+        res.highYieldTopics?.some(t => t.toLowerCase().includes(q))
+      );
+    });
+  }, [customResources, selectedCategory, searchQuery]);
+
+  // Filtered PowerPoints
+  const filteredPowerpoints = useMemo(() => {
+    return customResources.filter(res => {
+      if (res.resourceType !== 'powerpoint') return false;
+      const matchesCategory = selectedCategory === 'All' || res.category === selectedCategory;
+      const q = searchQuery.toLowerCase().trim();
+      if (!q) return matchesCategory;
+
+      return matchesCategory && (
+        res.title.toLowerCase().includes(q) ||
+        (res.subtitle && res.subtitle.toLowerCase().includes(q)) ||
+        (res.summary && res.summary.toLowerCase().includes(q)) ||
+        res.highYieldTopics?.some(t => t.toLowerCase().includes(q))
+      );
+    });
+  }, [customResources, selectedCategory, searchQuery]);
+
+  // Handle Download Action
+  const handleDownloadResource = async (res: StoredLibraryResource) => {
+    if (res.id) {
+      try {
+        await updateDoc(doc(db, 'library_resources', res.id), {
+          downloadCount: (res.downloadCount || 0) + 1
+        });
+        setCustomResources(prev => prev.map(r => r.id === res.id ? { ...r, downloadCount: (r.downloadCount || 0) + 1 } : r));
+      } catch (e) {
+        console.warn('Failed to increment download counter:', e);
+      }
+    }
+
+    setDownloadSuccessNotice(`Downloaded "${res.title}" successfully!`);
+    setTimeout(() => setDownloadSuccessNotice(null), 4000);
+
+    if (res.fileUrl && res.fileUrl.startsWith('http')) {
+      window.open(res.fileUrl, '_blank', 'noopener,noreferrer');
+    } else if (res.fileUrl && res.fileUrl.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = res.fileUrl;
+      link.download = res.fileName || `${res.title}.${res.resourceType === 'powerpoint' ? 'pptx' : 'pdf'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      // Dynamic fallback file download
+      const content = `NursePrep Clinical Resource\nTitle: ${res.title}\nCategory: ${res.category}\nAuthor: ${res.author || 'Clinical Faculty'}\n\nHigh-Yield Topics:\n${res.highYieldTopics?.join('\n') || 'Priority Nursing Care'}\n\nOverview:\n${res.summary || 'NCLEX Study Material'}`;
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = (res.fileName || res.title).replace(/\.(pdf|pptx|ppt)$/i, '') + (res.resourceType === 'powerpoint' ? '.pptx' : '.pdf');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  };
 
   // Execute Google Search in new tab
   const handleGoogleSearch = (customQuery?: string) => {
@@ -113,7 +253,18 @@ export function BookshelfLibrary() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <Link to="/admin/resources">
+                <button
+                  type="button"
+                  className="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 hover:text-white px-3.5 py-2 rounded-2xl flex items-center gap-2 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                >
+                  <FolderPlus className="w-4 h-4 text-amber-400" />
+                  <span>Admin: Add Books & PPTs</span>
+                  <ArrowUpRight className="w-3.5 h-3.5 opacity-70" />
+                </button>
+              </Link>
+
               <div className="bg-amber-950/60 border border-amber-500/30 px-3.5 py-2 rounded-2xl flex items-center gap-3">
                 <BookMarked className="w-5 h-5 text-amber-400" />
                 <div>
@@ -223,16 +374,72 @@ export function BookshelfLibrary() {
         </div>
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex items-center justify-between gap-4 flex-wrap border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+      {/* Download Alert Notice */}
+      {downloadSuccessNotice && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2 font-medium">
+            <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{downloadSuccessNotice}</span>
+          </div>
+          <button onClick={() => setDownloadSuccessNotice(null)} className="text-xs text-emerald-600 underline font-semibold">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Main Resource View Mode Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div className="inline-flex rounded-2xl bg-slate-100 p-1.5 border border-slate-200 text-xs font-bold self-start">
+          <button
+            type="button"
+            onClick={() => setActiveView('bookshelf')}
+            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
+              activeView === 'bookshelf'
+                ? 'bg-amber-900 text-white shadow-sm font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 text-amber-400" />
+            <span>Interactive Bookshelf ({filteredBooks.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveView('pdfs')}
+            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
+              activeView === 'pdfs'
+                ? 'bg-rose-700 text-white shadow-sm font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <FileText className="w-4 h-4 text-rose-300" />
+            <span>Downloadable PDFs ({filteredPdfs.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveView('powerpoints')}
+            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
+              activeView === 'powerpoints'
+                ? 'bg-amber-700 text-white shadow-sm font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Presentation className="w-4 h-4 text-amber-300" />
+            <span>PowerPoint Decks ({filteredPowerpoints.length})</span>
+          </button>
+        </div>
+
+        {/* Category Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+          <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-1">Filter:</span>
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+              className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat
-                  ? 'bg-amber-900 text-white shadow-sm'
+                  ? 'bg-slate-900 text-white shadow-xs'
                   : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
               }`}
             >
@@ -240,14 +447,11 @@ export function BookshelfLibrary() {
             </button>
           ))}
         </div>
-
-        <div className="text-xs text-slate-500 font-medium">
-          Displaying <span className="font-bold text-slate-800">{filteredBooks.length}</span> volumes on shelf
-        </div>
       </div>
 
       {/* THE BOOKSHELF CONTAINER */}
-      <div className="relative rounded-3xl p-6 md:p-10 shadow-2xl overflow-hidden bg-gradient-to-b from-[#2b1810] via-[#1f100a] to-[#140a06] border-8 border-[#3d2314]">
+      {activeView === 'bookshelf' && (
+        <div className="relative rounded-3xl p-6 md:p-10 shadow-2xl overflow-hidden bg-gradient-to-b from-[#2b1810] via-[#1f100a] to-[#140a06] border-8 border-[#3d2314]">
         {/* Bookshelf Top Decorative Moulding */}
         <div className="h-6 -mt-6 -mx-6 md:-mx-10 bg-gradient-to-b from-[#4e2c1a] to-[#361e12] border-b border-[#5c3420] shadow-md flex items-center justify-center">
           <div className="w-48 h-1.5 bg-[#5c3420] rounded-full opacity-60" />
@@ -396,6 +600,222 @@ export function BookshelfLibrary() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* VIEW 2: DOWNLOADABLE PDFS & CHEAT SHEETS */}
+      {activeView === 'pdfs' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-rose-600" />
+                Downloadable NCLEX & Clinical Nursing PDFs
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Download printable cheat sheets, drug dosage calculation guides, and high-yield summary PDFs directly to your device.
+              </p>
+            </div>
+            <Link to="/admin/resources">
+              <button
+                type="button"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
+                + Add PDF Guide
+              </button>
+            </Link>
+          </div>
+
+          {filteredPdfs.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
+              <FileText className="w-12 h-12 text-slate-300 mx-auto" />
+              <h3 className="font-bold text-slate-800">No PDF cheat sheets found</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                No downloadable PDFs have been uploaded for this category. Administrators can add PDFs via the resource manager.
+              </p>
+              <Link to="/admin/resources">
+                <button className="text-xs bg-slate-900 text-white font-semibold px-4 py-2 rounded-xl mt-2 cursor-pointer">
+                  Open Admin Resource Manager
+                </button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredPdfs.map((pdf) => (
+                <div
+                  key={pdf.id}
+                  className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <span className="text-[11px] font-semibold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md">
+                        {pdf.category}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2">
+                        {pdf.title}
+                      </h3>
+                      {pdf.subtitle && (
+                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{pdf.subtitle}</p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                      {pdf.fileSize && <span>Size: {pdf.fileSize}</span>}
+                      {pdf.pageCount && <span>{pdf.pageCount} Pages</span>}
+                      <span>{pdf.downloadCount || 0} Downloads</span>
+                    </div>
+
+                    {pdf.summary && (
+                      <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 line-clamp-3 leading-relaxed">
+                        {pdf.summary}
+                      </p>
+                    )}
+
+                    {pdf.highYieldTopics && pdf.highYieldTopics.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {pdf.highYieldTopics.slice(0, 3).map((topic, i) => (
+                          <span key={i} className="text-[10px] font-medium bg-rose-50 text-rose-800 px-2 py-0.5 rounded-md border border-rose-100">
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-mono truncate max-w-[150px]">
+                      {pdf.fileName || 'guide.pdf'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadResource(pdf)}
+                      className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download PDF
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* VIEW 3: POWERPOINT PRESENTATIONS (.PPTX) */}
+      {activeView === 'powerpoints' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Presentation className="w-5 h-5 text-amber-600" />
+                Clinical Lecture PowerPoint Presentations (.pptx)
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Download interactive faculty slide decks for pharmacology, medical-surgical nursing, pediatrics, and emergency care.
+              </p>
+            </div>
+            <Link to="/admin/resources">
+              <button
+                type="button"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
+                + Add PowerPoint Deck
+              </button>
+            </Link>
+          </div>
+
+          {filteredPowerpoints.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
+              <Presentation className="w-12 h-12 text-slate-300 mx-auto" />
+              <h3 className="font-bold text-slate-800">No PowerPoint presentations found</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                No slide decks have been uploaded for this category yet. Administrators can add presentations anytime via the management panel.
+              </p>
+              <Link to="/admin/resources">
+                <button className="text-xs bg-slate-900 text-white font-semibold px-4 py-2 rounded-xl mt-2 cursor-pointer">
+                  Open Admin Resource Manager
+                </button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredPowerpoints.map((ppt) => (
+                <div
+                  key={ppt.id}
+                  className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
+                        <Presentation className="w-5 h-5" />
+                      </div>
+                      <span className="text-[11px] font-semibold bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-md border border-amber-200">
+                        {ppt.category}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2">
+                        {ppt.title}
+                      </h3>
+                      {ppt.subtitle && (
+                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{ppt.subtitle}</p>
+                      )}
+                    </div>
+
+                    <div className="text-xs text-slate-600 space-y-0.5">
+                      <p><strong className="text-slate-800">Lecturer:</strong> {ppt.author || 'Clinical Faculty'}</p>
+                      <div className="flex items-center gap-3 text-[11px] text-slate-500 pt-1">
+                        {ppt.slideCount && <span>{ppt.slideCount} Slides</span>}
+                        {ppt.fileSize && <span>{ppt.fileSize}</span>}
+                        <span>{ppt.downloadCount || 0} Downloads</span>
+                      </div>
+                    </div>
+
+                    {ppt.summary && (
+                      <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 line-clamp-3 leading-relaxed">
+                        {ppt.summary}
+                      </p>
+                    )}
+
+                    {ppt.highYieldTopics && ppt.highYieldTopics.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {ppt.highYieldTopics.slice(0, 3).map((topic, i) => (
+                          <span key={i} className="text-[10px] font-medium bg-amber-50 text-amber-900 px-2 py-0.5 rounded-md border border-amber-200">
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-mono truncate max-w-[150px]">
+                      {ppt.fileName || 'presentation.pptx'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadResource(ppt)}
+                      className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download Slides (.pptx)
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* READING DESK MODAL (When a book is clicked) */}
       <AnimatePresence>

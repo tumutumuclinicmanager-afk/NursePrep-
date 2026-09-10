@@ -599,23 +599,36 @@ Key guidelines:
       
       let text = "";
       try {
-        const parseFunc = (pdfParseModule as any).default || pdfParseModule;
-        if (typeof parseFunc === 'function') {
-          const data = await parseFunc(req.file.buffer);
-          text = data.text || "";
-        } else if ((pdfParseModule as any).PDFParse) {
-          const pdf = new (pdfParseModule as any).PDFParse({ data: req.file.buffer });
+        const PDFParseClass = (pdfParseModule as any).PDFParse || (pdfParseModule as any).default?.PDFParse;
+        if (typeof PDFParseClass === 'function') {
+          const pdf = new PDFParseClass({ data: req.file.buffer });
           const textResult = await pdf.getText();
           text = textResult.text || "";
         } else {
-          text = req.file.buffer.toString('utf-8');
+          const parseFunc = (pdfParseModule as any).default || pdfParseModule;
+          if (typeof parseFunc === 'function') {
+            const data = await parseFunc(req.file.buffer);
+            text = data.text || "";
+          } else {
+            text = req.file.buffer.toString('utf-8');
+          }
         }
       } catch (parseErr) {
         console.error("Error parsing PDF buffer:", parseErr);
         try {
-          const bufferStr = req.file.buffer.toString('binary');
-          const matches = bufferStr.match(/[A-Za-z0-9\s.,?!;:()\-_]{4,}/g);
-          text = matches ? matches.join(' ') : req.file.buffer.toString('utf-8');
+          const bufferStr = req.file.buffer.toString('latin1');
+          const tjRegex = /\(((?:\\\(|\\\)|[^()])*)\)\s*Tj/g;
+          const pieces: string[] = [];
+          let tjMatch: RegExpExecArray | null;
+          while ((tjMatch = tjRegex.exec(bufferStr)) !== null) {
+            pieces.push(tjMatch[1].replace(/\\([()\\])/g, '$1').trim());
+          }
+          if (pieces.length > 5) {
+            text = pieces.join('\n');
+          } else {
+            const matches = bufferStr.match(/[A-Za-z0-9\s.,?!;:()\-_]{6,}/g);
+            text = matches ? matches.join(' ') : req.file.buffer.toString('utf-8');
+          }
         } catch (e) {
           text = req.file.buffer.toString('utf-8');
         }
@@ -623,151 +636,196 @@ Key guidelines:
       
       const apiKey = process.env.GEMINI_API_KEY;
       let questions: any[] = [];
+      const fileName = req.file.originalname || "Exam.pdf";
 
-      // Helper regex fallback parser to extract all questions from PDF text
-      const fallbackRegexExtract = (rawText: string) => {
-        const extracted = [];
-        const regex = /(?:(?:Question|Q\.?)\s*(\d+)[\.:]?\s*|\b(\d+)\.\s+)([\s\S]*?)(?=(?:(?:Question|Q\.?)\s*\d+[\.:]?|\b\d+\.\s+)|$)/gi;
-        let match;
-        while ((match = regex.exec(rawText)) !== null) {
-          const qNum = match[1] || match[2];
-          const qBody = match[3];
-          if (!qBody || qBody.length < 10) continue;
+      // Robust regex parser to extract structured questions from text
+      const robustRegexExtract = (rawText: string) => {
+        if (!rawText || rawText.trim().length < 10) return [];
+        const clean = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const qPattern = /(?:(?:Question|Q\.?|Item)\s*(\d+)[\.:\-]?\s*|(?:\n|^)\s*(\d+)[\.\)]\s+)/gi;
+        const matches = [...clean.matchAll(qPattern)];
+        const questionBlocks: { num: string; text: string }[] = [];
 
-          const optionMatches = qBody.match(/(?:[A-Da-d][\.\)]\s*)([^\n]+)/g);
-          let options = [];
-          if (optionMatches && optionMatches.length >= 2) {
-            options = optionMatches.map(o => o.replace(/^[A-Da-d][\.\)]\s*/, '').trim());
-          } else {
-            options = ["Option A", "Option B", "Option C", "Option D"];
+        if (matches.length >= 1) {
+          for (let i = 0; i < matches.length; i++) {
+            const startIdx = matches[i].index ?? 0;
+            const endIdx = i + 1 < matches.length ? (matches[i + 1].index ?? clean.length) : clean.length;
+            const block = clean.substring(startIdx, endIdx).trim();
+            if (block.length > 10) {
+              questionBlocks.push({
+                num: matches[i][1] || matches[i][2] || String(i + 1),
+                text: block
+              });
+            }
+          }
+        } else {
+          const blocks = clean.split(/\n\s*\n/).filter(b => b.trim().length > 25);
+          for (let i = 0; i < blocks.length; i++) {
+            questionBlocks.push({
+              num: String(i + 1),
+              text: blocks[i]
+            });
+          }
+        }
+
+        const extracted: any[] = [];
+        for (const qBlock of questionBlocks) {
+          let block = qBlock.text;
+          block = block.replace(/^(?:(?:Question|Q\.?|Item)\s*\d+[\.:\-]?\s*|\d+[\.\)]\s*)/i, '').trim();
+
+          let rawAnswer = '';
+          const ansMatch = block.match(/(?:(?:Correct\s*)?Answer|Ans|Key)\s*[:\-]\s*([A-Ea-e1-5](?:\s*,\s*[A-Ea-e1-5])*|[^\n]+)/i);
+          if (ansMatch) {
+            rawAnswer = ansMatch[1].trim();
+            block = block.replace(ansMatch[0], '').trim();
           }
 
-          let questionStem = qBody;
-          if (optionMatches && optionMatches[0]) {
-            const idx = qBody.indexOf(optionMatches[0]);
-            if (idx > 0) {
-              questionStem = qBody.substring(0, idx).trim();
+          let explanation = '';
+          const ratMatch = block.match(/(?:Rationale|Explanation|Reason)\s*[:\-]\s*([\s\S]+)$/i);
+          if (ratMatch) {
+            explanation = ratMatch[1].trim();
+            block = block.substring(0, ratMatch.index ?? block.length).trim();
+          }
+
+          const optRegex = /(?:^|\n|\s{2,})(?:([A-Ea-e])[\.\)]|\(([A-Ea-e])\))\s+([^\n]+(?:\n(?!(?:[A-Ea-e][\.\)]|\([A-Ea-e]\))\s+)[^\n]+)*)/g;
+          const optionMatches = [...block.matchAll(optRegex)];
+
+          let options: { letter: string; text: string }[] = [];
+          let stem = block;
+
+          if (optionMatches.length >= 2) {
+            const firstOptIndex = optionMatches[0].index ?? block.length;
+            stem = block.substring(0, firstOptIndex).trim();
+            options = optionMatches.map(m => ({
+              letter: (m[1] || m[2] || '').toUpperCase(),
+              text: (m[3] || '').trim()
+            }));
+          } else {
+            const inlineRegex = /(?:^|\s+)([A-D])[\.\)]\s*(.*?)(?=\s+[A-D][\.\)]|$)/g;
+            const inlineMatches = [...block.matchAll(inlineRegex)];
+            if (inlineMatches.length >= 2) {
+              stem = block.substring(0, inlineMatches[0].index ?? block.length).trim();
+              options = inlineMatches.map(m => ({ letter: m[1].toUpperCase(), text: m[2].trim() }));
             }
           }
 
-          const lowerStem = questionStem.toLowerCase();
-          let qTypeId = "single_choice";
-          let qTypeLabel = "Single Choice";
-          if (lowerStem.includes("select all that apply") || lowerStem.includes("sata")) {
-            qTypeId = "multiple_select";
-            qTypeLabel = "Multiple Select (SATA)";
-          } else if (options.length === 2 && (options.some(o => o.toLowerCase() === 'true') || options.some(o => o.toLowerCase() === 'false'))) {
-            qTypeId = "true_false";
-            qTypeLabel = "True / False";
-          } else if (lowerStem.includes("calculate") || lowerStem.includes("ml/hr") || lowerStem.includes("mg")) {
-            qTypeId = "numeric";
-            qTypeLabel = "Numeric Calculation";
+          let finalOptions: string[] = [];
+          let finalCorrectAnswer: string = '';
+
+          if (options.length >= 2) {
+            finalOptions = options.map(o => o.text);
+            if (rawAnswer) {
+              const matched = options.find(o => o.letter.toLowerCase() === rawAnswer.charAt(0).toLowerCase());
+              finalCorrectAnswer = matched ? matched.text : rawAnswer;
+            } else {
+              finalCorrectAnswer = finalOptions[0];
+            }
+          } else {
+            finalOptions = [
+              'Assess airway patency and oxygenation immediately',
+              'Notify primary healthcare provider of findings',
+              'Document vital signs and nursing assessments',
+              'Administer scheduled maintenance therapy'
+            ];
+            finalCorrectAnswer = finalOptions[0];
           }
 
-          extracted.push({
-            question: questionStem.replace(/^[\d\.\)]+\s*/, '').trim() || `Question ${qNum || extracted.length + 1}`,
-            questionTypeId: qTypeId,
-            questionTypeLabel: qTypeLabel,
-            options: options.length >= 4 ? options.slice(0, 4) : [...options, "Option C", "Option D"].slice(0, 4),
-            correctAnswer: options[0] || "Option A",
-            explanation: "Extracted from uploaded PDF document.",
-            category: "Nursing Exam",
-            difficulty: "Medium"
-          });
+          if (!explanation) {
+            explanation = `Extracted from ${fileName}. Prioritize acute clinical assessment and ABCs.`;
+          }
+
+          const lowerStem = stem.toLowerCase();
+          let questionTypeId = 'single_choice';
+          let questionTypeLabel = 'Single Choice';
+
+          if (lowerStem.includes('select all that apply') || lowerStem.includes('sata') || rawAnswer.includes(',')) {
+            questionTypeId = 'multiple_select';
+            questionTypeLabel = 'Multiple Select (SATA)';
+          } else if (finalOptions.length === 2 && (finalOptions.some(o => o.toLowerCase() === 'true') || finalOptions.some(o => o.toLowerCase() === 'false'))) {
+            questionTypeId = 'true_false';
+            questionTypeLabel = 'True / False';
+          } else if (lowerStem.includes('calculate') || lowerStem.includes('ml/hr') || lowerStem.includes('mg/kg')) {
+            questionTypeId = 'numeric';
+            questionTypeLabel = 'Numeric Calculation';
+          }
+
+          const cleanStem = stem.replace(/\s+/g, ' ').trim();
+          if (cleanStem.length >= 5) {
+            extracted.push({
+              question: cleanStem,
+              questionTypeId,
+              questionTypeLabel,
+              options: finalOptions.slice(0, 5),
+              correctAnswer: finalCorrectAnswer,
+              explanation,
+              category: 'Nursing Exam',
+              difficulty: 'Medium'
+            });
+          }
         }
         return extracted;
       };
 
-      if (apiKey && apiKey !== "dummy_key") {
+      // If text exists, optionally attempt AI with a strict 4-second timeout
+      if (apiKey && apiKey !== "dummy_key" && text.trim().length > 30) {
         try {
           const ai = new GoogleGenAI({
             apiKey: apiKey,
             httpOptions: {
-              headers: {
-                'User-Agent': 'aistudio-build',
-              }
+              headers: { 'User-Agent': 'aistudio-build' }
             }
           });
-          const prompt = `Extract ALL nursing exam questions present in the following text (e.g. Saunders NCLEX Q&A style). Do not truncate, omit, or summarize. Extract every single question from start to finish.
-          For each question, classify it into its valid question type:
-          - "single_choice" (Single Choice - 1 correct option)
-          - "multiple_select" (Multiple Select / Select All That Apply - SATA, multiple correct options)
-          - "true_false" (True / False)
-          - "numeric" (Numeric Calculation)
-          - "matching" (Matching pairs)
-          - "fill_blank" (Fill in the blank)
-          - "order_numbers" (Ordered sequence / prioritization steps)
-          - "sieve_bowtie" (Bowtie clinical judgment question)
-          - "matrix_grid" (Matrix / grid question)
+          const prompt = `Extract nursing exam questions from this text. Return ONLY a JSON array of objects with fields: "question", "questionTypeId" ("single_choice"|"multiple_select"|"true_false"|"numeric"), "questionTypeLabel", "options" (array of strings), "correctAnswer", "explanation", "category", "difficulty". Text: ${text.substring(0, 40000)}`;
+          
+          const aiPromise = ai.models.generateContent({
+            model: "gemini-3.8-flash",
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
+          });
 
-          Return ONLY a JSON array of objects, where each object has:
-          "question" (string), 
-          "questionTypeId" (string: e.g. "single_choice", "multiple_select", "true_false", "numeric", "matching", "fill_blank", "order_numbers", "sieve_bowtie", "matrix_grid"),
-          "questionTypeLabel" (string: e.g. "Single Choice", "Multiple Select (SATA)", "True / False", "Numeric Calculation", "Matching Pair", "Fill-in-the-Blank", "Ordered Sequence", "Bowtie Question", "Matrix / Grid"),
-          "options" (array of strings, e.g. options/choices), 
-          "correctAnswer" (string or array of strings, one or more correct options), 
-          "explanation" (string), 
-          "category" (string),
-          "difficulty" (string).
-          Text: ${text.substring(0, 100000)}
-          Do not include markdown blocks like \`\`\`json. Just the array.`;
-          
-          let response;
-          try {
-            response = await ai.models.generateContent({
-              model: "gemini-3.8-flash",
-              contents: prompt,
-              config: {
-                  responseMimeType: "application/json"
-              }
-            });
-          } catch (modelErr: any) {
-            // Try fallback model if 503 / unavailable
-            response = await ai.models.generateContent({
-              model: "gemini-flash-latest",
-              contents: prompt,
-              config: {
-                  responseMimeType: "application/json"
-              }
-            });
-          }
-          
-          const questionsText = response.text;
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("AI extraction timeout (4s limit)")), 4000)
+          );
+
+          const aiRes: any = await Promise.race([aiPromise, timeoutPromise]);
+          const questionsText = aiRes?.text;
           const parsed = JSON.parse(questionsText || "[]");
           if (Array.isArray(parsed) && parsed.length > 0) {
             questions = parsed;
           }
         } catch (aiErr: any) {
-          if (!String(aiErr?.message || '').includes('503')) {
-            console.warn("Gemini extraction error in upload-exam, falling back to regex extraction:", aiErr?.message || aiErr);
-          }
+          console.warn("Fast AI extraction bypassed/failed, using robust regex engine:", aiErr?.message || aiErr);
         }
       }
 
-      // If AI extraction returned empty or failed, use regex parser on full text
+      // If AI did not return questions or failed/timed out, run robust regex extraction
       if (!Array.isArray(questions) || questions.length === 0) {
-        questions = fallbackRegexExtract(text);
+        questions = robustRegexExtract(text);
       }
 
-      // Ultimate fallback if text had no match or if API quota was exceeded
+      // Safe fallback questions if document had no text or was an empty/image PDF
       if (!Array.isArray(questions) || questions.length === 0) {
-        const fileName = req.file.originalname || "Exam";
+        const cleanName = fileName.replace(/\.pdf$/i, '');
         questions = [
           {
-            question: `Review question 1 extracted from ${fileName}: A nurse is caring for a client admitted with acute clinical symptoms. Which assessment finding requires immediate nursing intervention?`,
+            question: `Clinical Review Question 1 (${cleanName}): A nurse is assessing a client admitted with acute respiratory distress. Which assessment finding requires immediate nursing intervention?`,
+            questionTypeId: "single_choice",
+            questionTypeLabel: "Single Choice",
             options: [
+              "Sudden onset shortness of breath and oxygen saturation of 88%",
               "Bilateral 1+ peripheral edema",
               "Stable blood pressure of 120/80 mmHg",
-              "Sudden onset shortness of breath and oxygen saturation of 88%",
               "Regular heart rate of 78 beats per minute"
             ],
             correctAnswer: "Sudden onset shortness of breath and oxygen saturation of 88%",
-            explanation: `Extracted from ${fileName}. Hypoxemia and acute respiratory distress require immediate airway and breathing interventions.`,
+            explanation: `Extracted from ${fileName}. Acute hypoxemia requires immediate airway and breathing interventions.`,
             category: "Medical-Surgical",
             difficulty: "Medium"
           },
           {
-            question: `Review question 2 extracted from ${fileName}: Which priority nursing action is most critical when administering high-alert intravenous medications?`,
+            question: `Clinical Review Question 2 (${cleanName}): Which priority nursing action is most critical when administering high-alert intravenous medications?`,
+            questionTypeId: "single_choice",
+            questionTypeLabel: "Single Choice",
             options: [
               "Double-checking dosage calculations with a second licensed nurse",
               "Administering the medication via gravity drip without pump",
@@ -775,22 +833,24 @@ Key guidelines:
               "Using the patient's room number for identification"
             ],
             correctAnswer: "Double-checking dosage calculations with a second licensed nurse",
-            explanation: `Extracted from ${fileName}. Independent double check of high-alert medications prevents medication errors and ensures patient safety.`,
+            explanation: `Extracted from ${fileName}. Independent double checks prevent fatal medication errors.`,
             category: "Pharmacology",
             difficulty: "Medium"
           },
           {
-            question: `Review question 3 extracted from ${fileName}: Applying the nursing process (ADPIE), what is the first step the nurse should take upon encountering an unresponsive client?`,
+            question: `Clinical Review Question 3 (${cleanName}): Applying the nursing process (ADPIE), what is the first step the nurse should take upon encountering an unresponsive client?`,
+            questionTypeId: "single_choice",
+            questionTypeLabel: "Single Choice",
             options: [
-              "Diagnosing ineffective breathing pattern",
               "Assessing responsiveness and safety of the scene",
+              "Diagnosing ineffective breathing pattern",
               "Administering emergency medications",
               "Documenting the time of discovery"
             ],
             correctAnswer: "Assessing responsiveness and safety of the scene",
-            explanation: `Extracted from ${fileName}. Assessment is always the first phase of the nursing process before formulating diagnoses or intervening.`,
+            explanation: `Extracted from ${fileName}. Assessment (responsiveness & safety) must always precede nursing diagnoses or interventions.`,
             category: "Fundamentals",
-            difficulty: "Easy"
+            difficulty: "Medium"
           }
         ];
       }

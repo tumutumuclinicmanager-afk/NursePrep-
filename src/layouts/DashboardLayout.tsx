@@ -65,6 +65,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
     if (userRole === 'admin') {
       return [
         { name: 'Overview', icon: LayoutDashboard, path: '/admin' },
+        { name: 'Books, PDFs & PPTs', icon: Library, path: '/admin/resources' },
         { name: 'Badges & Streak Config', icon: Award, path: '/admin/badges' },
         { name: 'Question Bank & Creator', icon: Edit3, path: '/admin/questions' },
         { name: 'User Management', icon: GraduationCap, path: '/admin/users' },
@@ -76,6 +77,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
     if (userRole === 'staff') {
       return [
         { name: 'Dashboard', icon: LayoutDashboard, path: '/staff' },
+        { name: 'Books, PDFs & PPTs', icon: Library, path: '/staff/resources' },
         { name: 'Upload Exams', icon: FileText, path: '/staff/upload' },
         { name: 'Live Sessions', icon: Video, path: '/staff/sessions' },
         { name: 'Student Queries', icon: MessageSquare, path: '/staff/queries' },
