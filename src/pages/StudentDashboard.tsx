@@ -19,7 +19,9 @@ import {
   ShieldCheck,
   BarChart2,
   ArrowRight,
-  Library
+  Library,
+  HeartPulse,
+  Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -110,293 +112,270 @@ export default function StudentDashboard() {
     fetchUserData();
   }, []);
 
-  // Compute Weekly Progress bar chart data (7 Days ending Today)
-  const now = new Date();
-  const daysOfWeekShort = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-  
-  const weeklyBarData = Array.from({ length: 7 }, (_, index) => {
-    const dayOffset = 6 - index;
-    const d = new Date(now);
-    d.setDate(now.getDate() - dayOffset);
+  // Exam Bank Snapshot categories
+  const examBankCategories = [
+    {
+      id: 'hesi',
+      title: 'HESI Suite',
+      badge: 'Admissions & Specialty',
+      categoryParam: 'hesi',
+      tagline: 'HESI A2, RN/LPN & Exit Tests',
+      description: 'Admission assessment (A2), pediatric & med-surg specialty packs, and graduation exit conversion scoring.',
+      modules: ['HESI A2 Admission', 'HESI RN Specialty', 'HESI LPN Mastery', 'HESI Exit Exam'],
+      count: '410+ Questions',
+      bundleCount: '4 Exam Bundles',
+      icon: HeartPulse,
+      color: 'text-rose-600',
+      bgColor: 'bg-rose-50',
+      borderAccent: 'hover:border-rose-300',
+      badgeStyle: 'bg-rose-100 text-rose-800 border-rose-200',
+      btnStyle: 'bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white border-rose-200'
+    },
+    {
+      id: 'ati-teas',
+      title: 'ATI TEAS Suite',
+      badge: 'Entrance & Exit Predictor',
+      categoryParam: 'ati-teas',
+      tagline: 'TEAS 7, Modular & Comprehensive Exit',
+      description: 'TEAS 7 entrance diagnostics, modular nursing content, and 99% probability comprehensive predictor exit tests.',
+      modules: ['ATI TEAS 7 Prep', 'ATI RN Modular Test', 'ATI LPN Fundamentals', 'ATI Comprehensive Exit'],
+      count: '415+ Questions',
+      bundleCount: '4 Exam Bundles',
+      icon: BookOpen,
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-50',
+      borderAccent: 'hover:border-amber-300',
+      badgeStyle: 'bg-amber-100 text-amber-900 border-amber-200',
+      btnStyle: 'bg-amber-50 text-amber-800 hover:bg-amber-600 hover:text-white border-amber-200'
+    },
+    {
+      id: 'nclex',
+      title: 'NCLEX Prep',
+      badge: 'Licensure & NextGen NGN',
+      categoryParam: 'nclex',
+      tagline: 'NCLEX-RN, NCLEX-PN & NCK Licensure',
+      description: 'NextGen Clinical Judgment case studies, Bowtie decision trees, prioritization matrices, and board mocks.',
+      modules: ['NCLEX-RN NextGen Set', 'NCLEX-PN Licensure', 'Bowtie Questions', 'Kenya NCK Prep'],
+      count: '200+ Questions',
+      bundleCount: '3 Exam Bundles',
+      icon: ShieldCheck,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderAccent: 'hover:border-blue-300',
+      badgeStyle: 'bg-blue-100 text-blue-800 border-blue-200',
+      btnStyle: 'bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border-blue-200'
+    },
+    {
+      id: 'examplify',
+      title: 'Examplify Suite',
+      badge: 'Institution ExamSoft',
+      categoryParam: 'examplify',
+      tagline: 'Coursework & Program Exit Simulations',
+      description: 'Replicate collegiate timed ExamSoft testing environments, semester clinical exams, and exit benchmarks.',
+      modules: ['Examplify RN Coursework', 'Examplify LPN Clinical', 'Program Exit Simulation'],
+      count: '285+ Questions',
+      bundleCount: '3 Exam Bundles',
+      icon: Layers,
+      color: 'text-violet-600',
+      bgColor: 'bg-violet-50',
+      borderAccent: 'hover:border-violet-300',
+      badgeStyle: 'bg-violet-100 text-violet-800 border-violet-200',
+      btnStyle: 'bg-violet-50 text-violet-700 hover:bg-violet-600 hover:text-white border-violet-200'
+    }
+  ];
 
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const dayNum = String(d.getDate()).padStart(2, '0');
-    const dateKey = `${year}-${month}-${dayNum}`;
-    const dayLabel = daysOfWeekShort[d.getDay()];
-    const isToday = dayOffset === 0;
-
-    const matchingExams = history.filter((item) => {
-      let dateObj: Date | null = null;
-      if (item.timestamp) dateObj = new Date(item.timestamp);
-      else if (item.createdAt) dateObj = new Date(item.createdAt);
-      else if (item.date) dateObj = new Date(item.date);
-
-      if (dateObj && !isNaN(dateObj.getTime())) {
-        const itemKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-        return itemKey === dateKey;
-      }
-      return false;
-    });
-
-    const totalQuestions = matchingExams.reduce((acc, curr) => acc + (curr.totalQuestions || 0), 0);
-
-    return {
-      dateKey,
-      dayLabel,
-      isToday,
-      totalQuestions,
-      count: matchingExams.length,
-    };
-  });
-
-  const maxQuestionsInWeek = Math.max(...weeklyBarData.map(d => d.totalQuestions), 10);
   const unlockedBadgesCount = evaluatedBadges.filter(b => b.unlocked).length;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Welcome Banner */}
-      <div className="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-md relative overflow-hidden border border-slate-800">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="bg-blue-500/20 text-blue-300 text-xs font-bold px-3 py-1 rounded-full border border-blue-400/20">
-                NCLEX-RN Exam Prep Portal
-              </span>
-              <span className="text-xs text-slate-300 flex items-center gap-1">
-                <Flame className="w-4 h-4 text-orange-400 fill-orange-400" /> {stats.streak} Day Study Streak
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Welcome back to your NCLEX Command Center
-            </h1>
-            <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
-              Complete practice questions, generate custom study quizzes, and review your dedicated unit-by-unit performance metrics.
-            </p>
-          </div>
+    <div className="space-y-3 max-w-7xl mx-auto pb-12">
+      {/* Welcome Banner - Compact Bar */}
+      <div className="bg-slate-900 text-white rounded-xl px-3.5 py-1.5 shadow-2xs border border-slate-800 flex items-center justify-between gap-2.5">
+        <h1 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
+          Welcome back to your NCLEX Command Center
+        </h1>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={() => navigate('/dashboard/generator')}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md flex items-center gap-2"
-            >
-              <Zap className="w-4 h-4 fill-white" />
-              Quick Quiz
-            </Button>
-            <Button
-              onClick={() => navigate('/dashboard/performance')}
-              className="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-4 py-2.5 rounded-xl border border-white/20 flex items-center gap-2"
-            >
-              <BarChart2 className="w-4 h-4 text-blue-300" />
-              View Performance
-            </Button>
-          </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button
+            size="sm"
+            onClick={() => navigate('/dashboard/generator')}
+            className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] px-2.5 h-6.5 rounded-lg shadow-2xs flex items-center gap-1"
+          >
+            <Zap className="w-3 h-3 fill-white" />
+            <span className="hidden sm:inline">Quick Quiz</span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => navigate('/dashboard/performance')}
+            className="bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] px-2.5 h-6.5 rounded-lg border border-white/20 flex items-center gap-1"
+          >
+            <BarChart2 className="w-3 h-3 text-blue-300" />
+            <span className="hidden sm:inline">Performance</span>
+          </Button>
         </div>
       </div>
 
-      {/* 14-Day Free Trial Banner / Status */}
+      {/* 14-Day Free Trial Banner / Status - Ultra Slim */}
       {!trial.isPaid && (
         trial.isExpired ? (
-          <div className="bg-gradient-to-r from-rose-900 to-slate-900 border border-rose-600/60 rounded-2xl p-5 text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Clock className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-extrabold text-white">14-Day Free Trial Ended</h3>
-                  <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded bg-rose-500/30 text-rose-200 border border-rose-400/30">
-                    Repository Locked
-                  </span>
-                </div>
-                <p className="text-xs text-rose-200/90 mt-0.5">
-                  Your free trial period has concluded. Please upgrade your account to access the complete exams repository.
-                </p>
+          <div className="bg-rose-950/80 border border-rose-600/50 rounded-xl px-3.5 py-1.5 text-white shadow-2xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Clock className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <div className="flex items-center gap-2 truncate">
+                <span className="text-xs font-bold text-white">14-Day Free Trial Ended</span>
+                <span className="text-[10px] text-rose-300 hidden sm:inline truncate">Upgrade to unlock all exam repositories</span>
               </div>
             </div>
             <Button
+              size="sm"
               onClick={() => navigate('/pricing')}
-              className="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs shrink-0"
+              className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] px-2.5 h-6.5 rounded-lg shadow-2xs shrink-0"
             >
-              Upgrade Account Now
+              Upgrade Now
             </Button>
           </div>
         ) : (
-          <div className="bg-gradient-to-r from-amber-500/10 via-blue-500/10 to-indigo-500/10 border border-amber-300/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xs">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 font-bold shadow-xs">
-                <Clock className="w-5 h-5 text-slate-950" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-extrabold text-slate-900">14-Day Free Trial Active</h4>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold border border-emerald-300">
-                    Live Countdown
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Time remaining: <span className="font-mono font-bold text-slate-900">{trial.daysRemaining}d {trial.hoursRemaining}h {trial.minutesRemaining}m {trial.secondsRemaining}s</span>. Full access to exam previews enabled.
-                </p>
-              </div>
+          <div className="bg-amber-500/10 border border-amber-300/80 rounded-xl px-3.5 py-1.5 text-slate-900 shadow-2xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="text-xs font-bold text-slate-900">14-Day Free Trial Active</span>
+              <span className="text-[11px] text-slate-600 hidden sm:inline">
+                • <span className="font-mono font-bold text-slate-900">{trial.daysRemaining}d {trial.hoursRemaining}h {trial.minutesRemaining}m</span> remaining
+              </span>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button onClick={() => navigate('/pricing')} className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs px-4 py-2 rounded-xl shadow-xs">
-                Upgrade Plan
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              onClick={() => navigate('/pricing')}
+              className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-[11px] px-2.5 h-6 rounded-lg shrink-0 shadow-2xs"
+            >
+              Upgrade
+            </Button>
           </div>
         )
       )}
 
-      {/* Top Summary Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top Summary Metrics Row - Ultra Compact Micro Tiles */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         {[
-          { title: 'Questions Attempted', value: stats.questionsAnswered.toString(), subtitle: 'Across All Exams', icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { title: 'Average Score', value: `${stats.averageScore}%`, subtitle: 'Overall Accuracy', icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { title: 'Badges Attained', value: `${unlockedBadgesCount} / ${evaluatedBadges.length}`, subtitle: 'Achievements Earned', icon: Award, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { title: 'Study Streak', value: `${stats.streak} Days`, subtitle: `${stats.xp} XP Accumulated`, icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50' }
+          { title: 'Questions Attempted', value: stats.questionsAnswered.toString(), icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { title: 'Average Score', value: `${stats.averageScore}%`, icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { title: 'Badges Attained', value: `${unlockedBadgesCount} / ${evaluatedBadges.length}`, icon: Award, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { title: 'Study Streak', value: `${stats.streak} Days`, icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50' }
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-4.5 rounded-2xl border border-slate-200 flex items-center gap-4 shadow-xs hover:border-blue-200 transition-colors">
-            <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center flex-shrink-0 shadow-2xs`}>
-              <stat.icon className="w-6 h-6" />
+          <div key={i} className="bg-white px-3 py-1.5 rounded-xl border border-slate-200 flex items-center gap-2.5 shadow-2xs hover:border-blue-200 transition-colors">
+            <div className={`w-7 h-7 ${stat.bg} ${stat.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+              <stat.icon className="w-3.5 h-3.5" />
             </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
-              <p className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">{stat.title}</p>
-              <p className="text-[10px] text-slate-500 font-medium">{stat.subtitle}</p>
+            <div className="min-w-0">
+              <p className="text-base font-black text-slate-900 tracking-tight leading-none">{stat.value}</p>
+              <p className="text-[10px] font-bold text-slate-600 uppercase tracking-tight truncate mt-0.5">{stat.title}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Dedicated Performance Teaser Banner (Points to Performance Page) */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 hover:border-blue-300 transition-all">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 shadow-2xs">
-            <BarChart2 className="w-6 h-6" />
-          </div>
-          <div className="space-y-1">
+      {/* Exam Bank Snapshot - Direct Navigation to HESI, ATI TEAS, NCLEX, and Examplify */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-extrabold text-slate-900 text-base">Unit Performance & Mastery Metrics</h2>
-              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-                Detailed View Available
+              <span className="text-[10px] uppercase font-black tracking-wider text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                Exam Bank Snapshot
+              </span>
+              <span className="text-[11px] text-slate-400 font-semibold hidden sm:inline">
+                • 4 Primary Nursing Curricula
               </span>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed max-w-2xl">
-              Track your exact questions attempted per unit, domain mastery percentages across all 8 NCLEX categories, and unlocked study badges on your dedicated Performance Page.
+            <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight mt-1">
+              Select Your Exam Category
+            </h2>
+            <p className="text-xs md:text-sm text-slate-500 mt-0.5">
+              Instant one-click access into HESI, ATI TEAS, NCLEX, and Examplify question repositories and simulated exams.
             </p>
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/dashboard/exams')}
+            className="text-xs font-bold text-slate-700 hover:text-blue-600 hover:border-blue-300 gap-1.5 shrink-0 self-start sm:self-center"
+          >
+            <Library className="w-3.5 h-3.5 text-blue-600" />
+            <span>Explore All 1,300+ Questions</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Button>
         </div>
 
-        <Button
-          onClick={() => navigate('/dashboard/performance')}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shrink-0 shadow-xs flex items-center gap-2"
-        >
-          <span>Open Performance Page</span>
-          <ArrowRight className="w-4 h-4" />
-        </Button>
-      </div>
-
-      {/* Main Grid: Weekly Activity Chart & Recent Quiz Log */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        
-        {/* Weekly Activity Progress */}
-        <div className="col-span-1 md:col-span-7 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <Activity className="w-5 h-5 text-blue-600" />
-                7-Day Practice Velocity
-              </h3>
-              <p className="text-xs text-slate-500">Questions attempted daily over the past week.</p>
-            </div>
-            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
-              {weeklyBarData.reduce((a, b) => a + b.totalQuestions, 0)} Total This Week
-            </span>
-          </div>
-
-          <div className="h-44 flex items-end justify-between gap-2 pt-4">
-            {weeklyBarData.map((d, idx) => {
-              const heightPercent = d.totalQuestions > 0 
-                ? Math.max(15, Math.round((d.totalQuestions / maxQuestionsInWeek) * 100)) 
-                : 6;
-
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
-                  <span className="text-[10px] font-bold text-slate-600">
-                    {d.totalQuestions > 0 ? d.totalQuestions : ''}
-                  </span>
-                  <div className="w-full bg-slate-100 rounded-t-lg h-32 flex items-end overflow-hidden p-1">
-                    <div 
-                      className={`w-full rounded-t-md transition-all duration-500 ${
-                        d.isToday 
-                          ? 'bg-blue-600 shadow-xs' 
-                          : d.totalQuestions > 0 ? 'bg-indigo-400' : 'bg-slate-200'
-                      }`}
-                      style={{ height: `${heightPercent}%` }}
-                    />
-                  </div>
-                  <span className={`text-[10px] font-bold ${d.isToday ? 'text-blue-700' : 'text-slate-500'}`}>
-                    {d.dayLabel}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Quick Recent Quiz Activity */}
-        <div className="col-span-1 md:col-span-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-              <Clock className="w-5 h-5 text-blue-600" />
-              Recent Practice Quizzes
-            </h3>
-            <button 
-              onClick={() => navigate('/dashboard/exams')}
-              className="text-xs font-bold text-blue-600 hover:underline"
-            >
-              All Exams &rarr;
-            </button>
-          </div>
-
-          {history.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-              <p className="text-xs font-medium">No quiz attempts recorded yet.</p>
-              <Button
-                onClick={() => navigate('/dashboard/generator')}
-                className="mt-3 bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg"
+        {/* 4 Cards Grid: HESI, ATI TEAS, NCLEX, Examplify */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+          {examBankCategories.map((cat) => {
+            const Icon = cat.icon;
+            return (
+              <div
+                key={cat.id}
+                onClick={() => navigate(`/dashboard/exams?category=${cat.categoryParam}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    navigate(`/dashboard/exams?category=${cat.categoryParam}`);
+                  }
+                }}
+                className={`group relative bg-slate-50/60 hover:bg-white rounded-2xl p-5 border border-slate-200 transition-all duration-200 flex flex-col justify-between text-left cursor-pointer hover:shadow-md hover:-translate-y-0.5 ${cat.borderAccent}`}
               >
-                Start First Quiz
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {history.slice(0, 4).map((item, idx) => (
-                <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                      <CheckCircle2 className="w-4 h-4" />
+                <div className="space-y-3.5">
+                  {/* Card Header: Icon & Badges */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className={`w-11 h-11 rounded-xl ${cat.bgColor} ${cat.color} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
+                      <Icon className="w-5 h-5" />
                     </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-xs line-clamp-1">{item.title || 'NCLEX Practice Quiz'}</h4>
-                      <p className="text-[10px] text-slate-500">{item.totalQuestions || 0} Questions</p>
-                    </div>
+                    <span className={`px-2.5 py-1 text-[10px] font-extrabold rounded-full border ${cat.badgeStyle}`}>
+                      {cat.count}
+                    </span>
                   </div>
 
-                  <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full shrink-0 ${
-                    (item.score || 0) >= 80 ? 'bg-emerald-100 text-emerald-800' :
-                    (item.score || 0) >= 70 ? 'bg-blue-100 text-blue-800' :
-                    'bg-amber-100 text-amber-800'
-                  }`}>
-                    {item.score || 0}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                  {/* Title & Tagline */}
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-0.5">
+                      {cat.badge}
+                    </span>
+                    <h3 className="text-base md:text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                      {cat.title}
+                    </h3>
+                    <p className="text-xs font-semibold text-slate-600 mt-0.5">
+                      {cat.tagline}
+                    </p>
+                  </div>
 
+                  {/* Description */}
+                  <p className="text-xs text-slate-500 leading-relaxed line-clamp-3">
+                    {cat.description}
+                  </p>
+
+                  {/* Modules Pills */}
+                  <div className="pt-1 flex flex-wrap gap-1.5">
+                    {cat.modules.map((mod, mIdx) => (
+                      <span
+                        key={mIdx}
+                        className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-md bg-white border border-slate-200/90 text-slate-600 group-hover:border-slate-300 transition-colors"
+                      >
+                        {mod}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Card Footer: Action Button */}
+                <div className="pt-4 mt-3 border-t border-slate-200/70 flex items-center justify-between text-xs font-bold">
+                  <span className="text-slate-400 text-[11px] font-semibold">{cat.bundleCount}</span>
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${cat.btnStyle}`}>
+                    <span>Launch Exams</span>
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Clinical Bookshelf & Google Search Quick Launcher Banner */}

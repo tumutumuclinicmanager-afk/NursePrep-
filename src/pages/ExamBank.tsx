@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ALL_QUIZ_QUESTIONS, normalizeExamCategory, ALL_EXAM_TYPES, ENTRANCE_EXAMS, NURSING_EXAMS, EXIT_EXAMS } from '@/data/quizQuestions';
 import { normalizeQuestion } from '@/lib/utils';
 import { useTrialCountdown, setSimulatedTrialExpired } from '@/lib/trialManager';
@@ -445,6 +445,7 @@ const EXAM_TYPE_CATEGORIES: Record<string, string[]> = {
 
 export default function ExamBank() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedExamGroup, setSelectedExamGroup] = useState<'All' | 'Entrance Exams' | 'Nursing Exams' | 'Exit Exams'>('All');
   const [selectedBoard, setSelectedBoard] = useState('All');
   const [selectedExamTypePage, setSelectedExamTypePage] = useState<string | null>(null);
@@ -458,6 +459,43 @@ export default function ExamBank() {
   const [selectedPlanFilter, setSelectedPlanFilter] = useState<'All' | 'My Plan Access' | 'free' | 'basic' | 'gold' | 'platinum'>('All');
   const [requiredPlanModalExam, setRequiredPlanModalExam] = useState<ExamItem | null>(null);
   const [practiceLimitInfo, setPracticeLimitInfo] = useState<{ limit: number; total: number } | null>(null);
+
+  // Sync with searchParams from URL (e.g., from Dashboard categories snapshot)
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    const boardParam = searchParams.get('board');
+    const searchParam = searchParams.get('search');
+
+    if (boardParam) {
+      setSelectedBoard(boardParam);
+      setSelectedExamGroup('All');
+      setSelectedExamTypePage(null);
+    } else if (categoryParam) {
+      const catLower = categoryParam.toLowerCase().trim();
+      setSelectedExamGroup('All');
+      setSelectedDomain('All Specialties');
+      setSelectedDifficulty('All');
+      setSelectedExamTypePage(null);
+
+      if (catLower.includes('hesi')) {
+        setSearchQuery('HESI');
+        setSelectedBoard('All');
+      } else if (catLower.includes('teas') || catLower.includes('ati')) {
+        setSearchQuery('ATI');
+        setSelectedBoard('All');
+      } else if (catLower.includes('nclex')) {
+        setSearchQuery('NCLEX');
+        setSelectedBoard('All');
+      } else if (catLower.includes('examplify')) {
+        setSearchQuery('Examplify');
+        setSelectedBoard('All');
+      } else {
+        setSearchQuery(categoryParam);
+      }
+    } else if (searchParam) {
+      setSearchQuery(searchParam);
+    }
+  }, [searchParams]);
 
   // 14-Day Free Trial hook
   const { trial, loading: trialLoading, refreshTrial } = useTrialCountdown(auth.currentUser);
