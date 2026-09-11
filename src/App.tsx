@@ -32,6 +32,7 @@ import PerformancePage from './pages/PerformancePage';
 import ScalabilityDashboard from './pages/ScalabilityDashboard';
 import AdminLibraryResources from './pages/admin/AdminLibraryResources';
 import { SessionTimeoutManager } from './components/SessionTimeoutManager';
+import { FloatingWhatsApp } from './components/FloatingWhatsApp';
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -102,6 +103,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <SessionTimeoutManager />
+      <FloatingWhatsApp />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
