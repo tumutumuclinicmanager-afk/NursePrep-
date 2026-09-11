@@ -74,10 +74,13 @@ export function FloatingWhatsApp() {
 
           {/* Text and phone number */}
           <div className="min-w-0 pr-0.5">
-            <div className="flex items-center gap-1.5 leading-none mb-0.5">
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
+            <div className="flex items-center gap-1.5 leading-none mb-0.5 relative group/tooltip">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 cursor-help" title="Available 24/7">
                 WhatsApp
               </span>
+              <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/tooltip:block bg-slate-900 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md shadow-xl border border-emerald-500/40 whitespace-nowrap z-50 animate-in fade-in">
+                Available 24/7
+              </div>
               <span className="inline-block w-1 h-1 rounded-full bg-emerald-400" />
               <span className="text-[9px] text-slate-300 font-medium">
                 Live Support
