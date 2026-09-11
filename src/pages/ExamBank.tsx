@@ -12,7 +12,7 @@ import {
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ALL_QUIZ_QUESTIONS, normalizeExamCategory, ALL_EXAM_TYPES, ENTRANCE_EXAMS, NURSING_EXAMS, EXIT_EXAMS } from '@/data/quizQuestions';
+import { ALL_QUIZ_QUESTIONS, normalizeExamCategory, ALL_EXAM_TYPES, ENTRANCE_EXAMS, NURSING_EXAMS, EXIT_EXAMS, sortExamCategories, POPULAR_EXAM_ORDER } from '@/data/quizQuestions';
 import { normalizeQuestion } from '@/lib/utils';
 import { useTrialCountdown, setSimulatedTrialExpired } from '@/lib/trialManager';
 import { TrialExpiredExamLock } from '@/components/TrialExpiredExamLock';
@@ -53,6 +53,95 @@ interface ExamItem {
     platinum: number;
   };
   isPublished?: boolean;
+}
+
+export interface ProminentExamMeta {
+  isProminent: boolean;
+  brand: 'ati' | 'hesi' | 'nclex' | 'examplify' | 'other';
+  titleColor: string;
+  pillStyle: string;
+  badgeBg: string;
+  cardBg: string;
+  cardBorder: string;
+  accentBadge: string;
+}
+
+export function getProminentExamMeta(text?: string): ProminentExamMeta {
+  if (!text) {
+    return {
+      isProminent: false,
+      brand: 'other',
+      titleColor: 'text-slate-800',
+      pillStyle: 'bg-slate-100 text-slate-700 border-slate-200 font-bold',
+      badgeBg: 'bg-slate-100 text-slate-600 border-slate-200',
+      cardBg: 'bg-white hover:bg-slate-50/80',
+      cardBorder: 'border-slate-200 hover:border-blue-300',
+      accentBadge: 'Curriculum'
+    };
+  }
+  const t = text.toUpperCase();
+  // 1. ATI TEAS and ATI suite - Prominent Honey Amber / Orange
+  if (t.includes('ATI') || t.includes('TEAS')) {
+    return {
+      isProminent: true,
+      brand: 'ati',
+      titleColor: 'text-amber-700',
+      pillStyle: 'bg-amber-100 text-amber-900 border-amber-300 font-black shadow-2xs',
+      badgeBg: 'bg-amber-100 text-amber-800 border-amber-300',
+      cardBg: 'bg-amber-50/50 hover:bg-amber-50/90',
+      cardBorder: 'border-amber-300/90 hover:border-amber-400',
+      accentBadge: 'ATI Prep'
+    };
+  }
+  // 2. HESI A2 and HESI suite - Prominent Crimson / Rose
+  if (t.includes('HESI')) {
+    return {
+      isProminent: true,
+      brand: 'hesi',
+      titleColor: 'text-rose-700',
+      pillStyle: 'bg-rose-100 text-rose-900 border-rose-300 font-black shadow-2xs',
+      badgeBg: 'bg-rose-100 text-rose-800 border-rose-300',
+      cardBg: 'bg-rose-50/50 hover:bg-rose-50/90',
+      cardBorder: 'border-rose-300/90 hover:border-rose-400',
+      accentBadge: 'HESI Suite'
+    };
+  }
+  // 3. NCLEX-RN and NCLEX-PN - Prominent Electric Royal Blue
+  if (t.includes('NCLEX')) {
+    return {
+      isProminent: true,
+      brand: 'nclex',
+      titleColor: 'text-blue-700',
+      pillStyle: 'bg-blue-100 text-blue-900 border-blue-300 font-black shadow-2xs',
+      badgeBg: 'bg-blue-100 text-blue-800 border-blue-300',
+      cardBg: 'bg-blue-50/50 hover:bg-blue-50/90',
+      cardBorder: 'border-blue-300/90 hover:border-blue-400',
+      accentBadge: 'NCLEX Board'
+    };
+  }
+  // 4. Examplify (ExamSoft) suite - Prominent Deep Purple / Violet
+  if (t.includes('EXAMPLIFY') || t.includes('EXAMSOFT')) {
+    return {
+      isProminent: true,
+      brand: 'examplify',
+      titleColor: 'text-purple-700',
+      pillStyle: 'bg-purple-100 text-purple-900 border-purple-300 font-black shadow-2xs',
+      badgeBg: 'bg-purple-100 text-purple-800 border-purple-300',
+      cardBg: 'bg-purple-50/50 hover:bg-purple-50/90',
+      cardBorder: 'border-purple-300/90 hover:border-purple-400',
+      accentBadge: 'Examplify'
+    };
+  }
+  return {
+    isProminent: false,
+    brand: 'other',
+    titleColor: 'text-slate-800',
+    pillStyle: 'bg-slate-100 text-slate-700 border-slate-200 font-bold',
+    badgeBg: 'bg-slate-100 text-slate-600 border-slate-200',
+    cardBg: 'bg-white hover:bg-slate-50/80',
+    cardBorder: 'border-slate-200 hover:border-blue-300',
+    accentBadge: 'General'
+  };
 }
 
 const defaultExamBundles: ExamItem[] = [
@@ -507,7 +596,7 @@ export default function ExamBank() {
   }, [trial.isPaid, trial.plan]);
 
   // State for dynamic board categories
-  const [dynamicBoardCategories, setDynamicBoardCategories] = useState<string[]>([...ALL_EXAM_TYPES]);
+  const [dynamicBoardCategories, setDynamicBoardCategories] = useState<string[]>(sortExamCategories([...ALL_EXAM_TYPES]));
 
   // Calculator state
   const [showCalculator, setShowCalculator] = useState(false);
@@ -1006,14 +1095,27 @@ export default function ExamBank() {
       const combinedExams = [...dbExams, ...dynamicBoardExams, ...defaultExamBundles].filter(
         ex => !deletedIds.includes(ex.id)
       );
+
+      // Sort exams so commonly used exams (ATI TEAS, HESI A2, NCLEX, Examplify) come first
+      combinedExams.sort((a, b) => {
+        const catA = a.category || '';
+        const catB = b.category || '';
+        const idxA = POPULAR_EXAM_ORDER.indexOf(catA);
+        const idxB = POPULAR_EXAM_ORDER.indexOf(catB);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.title.localeCompare(b.title);
+      });
+
       setExamsList(combinedExams);
 
-      // Collect all unique categories dynamically
+      // Collect all unique categories dynamically and sort with commonly used exams first
       const categorySet = new Set<string>([...ALL_EXAM_TYPES]);
       combinedExams.forEach(e => {
         if (e.category) categorySet.add(e.category);
       });
-      const allCategories = Array.from(categorySet);
+      const allCategories = sortExamCategories(Array.from(categorySet));
       setDynamicBoardCategories(allCategories);
 
       // Expand all categories by default
@@ -1497,31 +1599,37 @@ export default function ExamBank() {
     return (
       <div className="min-h-screen bg-slate-50/50 pb-20">
         <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 animate-in fade-in">
-        {/* Header Banner */}
-        <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-6 md:p-10 shadow-lg border border-slate-800 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded-full text-blue-300 text-xs font-semibold">
-              <FolderOpen className="w-3.5 h-3.5" /> Exam Type & Category Hub
+        {/* Header Banner - Sleek Compact Ribbon */}
+        <div className="bg-slate-900 text-white rounded-xl px-4 py-2.5 sm:px-5 sm:py-3 shadow-2xs border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div className="space-y-1 max-w-2xl">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-blue-500/20 border border-blue-400/30 rounded-full text-blue-300 text-[11px] font-bold">
+              <FolderOpen className="w-3.5 h-3.5" /> Exam Category Hub
             </div>
-            <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight">{selectedExamTypePage} Study Center</h1>
-            <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
-              Explore specialized modules, high-yield practice exams, and structured sub-categories for {selectedExamTypePage}. Select a category or practice exam below to begin.
+            <h1 className="text-xl md:text-2xl font-black tracking-tight flex items-center gap-2">
+              <span className={getProminentExamMeta(selectedExamTypePage).titleColor.replace('text-', 'text-')}>
+                {selectedExamTypePage}
+              </span> 
+              <span className="text-white">Study Center</span>
+            </h1>
+            <p className="text-slate-300 text-xs leading-relaxed hidden sm:block">
+              Explore specialized modules, high-yield practice exams, and structured sub-categories for {selectedExamTypePage}.
             </p>
-            <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-slate-300 font-semibold">
-              <span className="px-3 py-1 bg-white/10 rounded-full border border-white/10">
-                📊 {totalQs} Total Questions Available
+            <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs text-slate-300 font-semibold">
+              <span className="px-2.5 py-0.5 bg-white/10 rounded-full border border-white/10 text-[11px]">
+                📊 {totalQs} Total Questions
               </span>
-              <span className="px-3 py-1 bg-white/10 rounded-full border border-white/10">
-                📚 {typeExams.length} Exam Modules
+              <span className="px-2.5 py-0.5 bg-white/10 rounded-full border border-white/10 text-[11px]">
+                📚 {typeExams.length} Modules
               </span>
             </div>
           </div>
           <Button 
             variant="outline"
+            size="sm"
             onClick={() => setSelectedExamTypePage(null)}
-            className="text-white border-slate-700 hover:bg-slate-800 gap-2 shrink-0 bg-slate-800/80"
+            className="text-white border-slate-700 hover:bg-slate-800 gap-1.5 shrink-0 bg-slate-800/80 text-xs font-bold"
           >
-            <ChevronLeft className="w-4 h-4" /> Back to Exam Bank
+            <ChevronLeft className="w-3.5 h-3.5" /> Back to Exam Bank
           </Button>
         </div>
 
@@ -2108,63 +2216,69 @@ export default function ExamBank() {
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-6 md:p-10 shadow-lg border border-slate-800 relative overflow-hidden">
-        <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded-full text-blue-300 text-xs font-semibold">
-            <Layers className="w-3.5 h-3.5" /> Structured Nursing Curriculum Bank
+      {/* Header Banner - Sleek Compact Ribbon */}
+      <div className="bg-slate-900 text-white rounded-xl px-4 py-2.5 sm:px-5 sm:py-3 shadow-2xs border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 text-blue-400 flex items-center justify-center shrink-0">
+            <Layers className="w-4 h-4" />
           </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">Exam Bank & Repository</h1>
-          <p className="text-slate-300 text-sm md:text-base leading-relaxed">
-            Practice board-standard nursing exams classified by Exam Authority (NCK, NCLEX-RN, HESI, GED, and custom uploaded categories) and Clinical Specialties.
-          </p>
-          <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
-            <span className="text-slate-300">Your Active Plan:</span>
-            {trial.isPaid ? (
-              <span className="px-3 py-1 rounded-full font-extrabold bg-emerald-600 text-white uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
-                <ShieldCheck className="w-3.5 h-3.5" /> {userSubscriptionPlan.toUpperCase()} PLAN (UNLIMITED)
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">Exam Bank & Repository</h1>
+              <span className="text-[10px] font-bold text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded-full border border-blue-400/30 hidden sm:inline">
+                Curriculum Hub
               </span>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="px-3 py-1 rounded-full font-black bg-amber-400 text-slate-950 uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
-                  <Clock className="w-3.5 h-3.5" /> 14-DAY TRIAL: {trial.daysRemaining}d {trial.hoursRemaining}h {trial.minutesRemaining}m {trial.secondsRemaining}s LEFT
-                </span>
-                <button
-                  onClick={async () => {
-                    await setSimulatedTrialExpired(true, auth.currentUser);
-                    await refreshTrial();
-                  }}
-                  className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-semibold text-[10px] transition-colors"
-                  title="Simulate what happens when the 14 days finish"
-                >
-                  ⚡ Test: Expire Countdown Now
-                </button>
-              </div>
-            )}
-            <span className="text-slate-500 hidden sm:inline">|</span>
-            <span className="text-slate-300 font-medium">Filter by Access Plan:</span>
-            <div className="inline-flex flex-wrap items-center gap-1.5 p-1 bg-slate-800/80 rounded-lg border border-slate-700">
-              {[
-                { label: 'All Plans', val: 'All' },
-                { label: `My Plan (${userSubscriptionPlan.toUpperCase()})`, val: 'My Plan Access' },
-                { label: 'Free Tier', val: 'free' },
-                { label: 'Basic', val: 'basic' },
-                { label: 'Gold', val: 'gold' },
-                { label: 'Platinum', val: 'platinum' }
-              ].map(item => (
-                <button
-                  key={item.val}
-                  onClick={() => setSelectedPlanFilter(item.val as any)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
-                    selectedPlanFilter === item.val
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
             </div>
+            <p className="text-[11px] text-slate-400 truncate hidden md:block">
+              Priority testing repositories: ATI TEAS, HESI A2, NCLEX, Examplify & clinical specialties.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs shrink-0">
+          {trial.isPaid ? (
+            <span className="px-2.5 py-1 rounded-lg font-extrabold text-[11px] bg-emerald-600 text-white uppercase tracking-wider flex items-center gap-1 shadow-2xs">
+              <ShieldCheck className="w-3.5 h-3.5" /> {userSubscriptionPlan.toUpperCase()} (UNLIMITED)
+            </span>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className="px-2.5 py-1 rounded-lg font-bold text-[11px] bg-amber-400 text-slate-950 uppercase tracking-wider flex items-center gap-1 shadow-2xs">
+                <Clock className="w-3.5 h-3.5" /> {trial.daysRemaining}d {trial.hoursRemaining}h LEFT
+              </span>
+              <button
+                onClick={async () => {
+                  await setSimulatedTrialExpired(true, auth.currentUser);
+                  await refreshTrial();
+                }}
+                className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-[10px] font-medium transition-colors"
+                title="Simulate what happens when the 14 days finish"
+              >
+                Expire
+              </button>
+            </div>
+          )}
+
+          <div className="inline-flex items-center gap-1 p-0.5 bg-slate-800/90 rounded-lg border border-slate-700 text-[11px]">
+            {[
+              { label: 'All Plans', val: 'All' },
+              { label: 'My Plan', val: 'My Plan Access' },
+              { label: 'Free Tier', val: 'free' },
+              { label: 'Basic', val: 'basic' },
+              { label: 'Gold', val: 'gold' },
+              { label: 'Platinum', val: 'platinum' }
+            ].map(item => (
+              <button
+                key={item.val}
+                onClick={() => setSelectedPlanFilter(item.val as any)}
+                className={`px-2 py-0.5 rounded-md font-bold transition-all ${
+                  selectedPlanFilter === item.val
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -2201,36 +2315,32 @@ export default function ExamBank() {
         </div>
       )}
 
-      {/* Live Question Bank Inventory Bar */}
-      <div className="bg-white border border-blue-100 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-blue-600 text-white rounded-xl shadow-xs">
-            <Database className="w-6 h-6" />
+      {/* Live Question Bank Inventory Bar - Compact */}
+      <div className="bg-white border border-slate-200/80 rounded-xl px-4 py-2 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">
+            <Database className="w-4 h-4" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-extrabold text-slate-900">Actual Question Bank Inventory</h2>
-              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full flex items-center gap-1">
-                <Activity className="w-3 h-3" /> Live Tracking
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              <strong>{boardQuestionCounts['All'] || 0}</strong> items across all exam categories in real-time.
-            </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-xs sm:text-sm font-extrabold text-slate-900">Live Inventory:</h2>
+            <span className="text-xs text-slate-600">
+              <strong className="text-slate-900 font-black">{boardQuestionCounts['All'] || 0}</strong> verified questions in repository
+            </span>
+            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200 inline-flex items-center gap-1">
+              <Activity className="w-2.5 h-2.5" /> Live
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end md:self-center">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={fetchAllExamsAndQuestions}
-            disabled={loadingDb}
-            className="text-xs font-bold gap-1.5"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loadingDb ? 'animate-spin' : ''}`} /> Sync Bank ({dbQuestionsCount} Live Additions)
-          </Button>
-        </div>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={fetchAllExamsAndQuestions}
+          disabled={loadingDb}
+          className="text-xs font-bold gap-1.5 h-7 px-2.5 text-slate-700 hover:text-blue-600 shrink-0 self-end sm:self-auto"
+        >
+          <RefreshCw className={`w-3 h-3 ${loadingDb ? 'animate-spin' : ''}`} /> Sync Bank ({dbQuestionsCount} Live)
+        </Button>
       </div>
 
       {/* High-Level Exam Group Filter Tabs */}
@@ -2303,6 +2413,9 @@ export default function ExamBank() {
           })
           .map((catKey) => {
           const count = boardQuestionCounts[catKey] || 0;
+          const isSelected = selectedBoard === catKey;
+          const prominent = getProminentExamMeta(catKey);
+
           return (
             <button
               key={catKey}
@@ -2310,31 +2423,37 @@ export default function ExamBank() {
                 setSelectedBoard(catKey);
                 setSelectedExamTypePage(catKey);
               }}
-              className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                selectedBoard === catKey
+              className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                isSelected
                   ? 'bg-blue-600 border-blue-600 text-white shadow-md ring-2 ring-blue-500/20'
-                  : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-slate-50/80'
+                  : `${prominent.cardBg} ${prominent.cardBorder} text-slate-700 hover:shadow-xs`
               }`}
             >
               <div>
                 <div className="flex items-center justify-between gap-1 mb-1">
-                  <span className={`text-[10px] font-bold uppercase tracking-wider block ${
-                    selectedBoard === catKey ? 'text-blue-200' : 'text-slate-400'
+                  <span className={`text-[10px] font-extrabold uppercase tracking-wider block ${
+                    isSelected ? 'text-blue-200' : prominent.isProminent ? prominent.titleColor : 'text-slate-400'
                   }`}>
-                    Authority
+                    {prominent.isProminent ? prominent.accentBadge : 'Authority'}
                   </span>
                   <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded-full ${
-                    selectedBoard === catKey 
+                    isSelected 
                       ? 'bg-white/20 text-white' 
-                      : 'bg-blue-50 text-blue-700 border border-blue-100'
+                      : prominent.isProminent
+                        ? prominent.pillStyle
+                        : 'bg-blue-50 text-blue-700 border border-blue-100'
                   }`}>
-                    {count} {count === 1 ? 'Question' : 'Questions'}
+                    {count} {count === 1 ? 'Q' : 'Qs'}
                   </span>
                 </div>
-                <h3 className="font-bold text-sm md:text-base">{catKey}</h3>
+                <h3 className={`text-sm md:text-base font-black ${
+                  isSelected ? 'text-white' : prominent.titleColor
+                }`}>
+                  {catKey}
+                </h3>
               </div>
-              <p className={`text-[11px] mt-2 line-clamp-2 ${
-                selectedBoard === catKey ? 'text-blue-100' : 'text-slate-500'
+              <p className={`text-[11px] mt-1.5 line-clamp-2 ${
+                isSelected ? 'text-blue-100' : 'text-slate-500'
               }`}>
                 {catKey} Specialty & Licensure Bank
               </p>
@@ -2449,22 +2568,35 @@ export default function ExamBank() {
           ) : (
             (Object.entries(groupedExams) as [string, ExamItem[]][]).map(([catKey, exams]) => {
               const isExpanded = expandedCategories[catKey] !== false;
+              const prominent = getProminentExamMeta(catKey);
 
               return (
-                <div key={catKey} className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                <div key={catKey} className={`bg-white rounded-xl border shadow-xs overflow-hidden ${
+                  prominent.isProminent ? prominent.cardBorder : 'border-slate-200'
+                }`}>
                   {/* Classification Category Header */}
                   <div 
                     onClick={() => toggleCategory(catKey)}
-                    className="p-4 md:p-5 bg-slate-50/80 hover:bg-slate-100/80 transition-colors border-b border-slate-200 flex items-center justify-between cursor-pointer select-none"
+                    className={`p-3.5 md:p-4 transition-colors border-b flex items-center justify-between cursor-pointer select-none ${
+                      prominent.isProminent 
+                        ? `${prominent.badgeBg.split(' ')[0]} hover:brightness-95 border-slate-200` 
+                        : 'bg-slate-50/80 hover:bg-slate-100/80 border-slate-200'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg font-bold bg-blue-100 text-blue-700">
+                      <div className={`p-2 rounded-lg font-bold ${
+                        prominent.isProminent ? prominent.badgeBg : 'bg-blue-100 text-blue-700'
+                      }`}>
                         {isExpanded ? <FolderOpen className="w-5 h-5" /> : <Folder className="w-5 h-5" />}
                       </div>
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-lg font-extrabold text-slate-900">{catKey}</h2>
-                          <span className="bg-blue-100 text-blue-800 text-xs font-extrabold px-2.5 py-0.5 rounded-full border border-blue-200">
+                          <h2 className={`text-base md:text-lg font-black ${prominent.titleColor}`}>
+                            {catKey}
+                          </h2>
+                          <span className={`text-xs font-black px-2.5 py-0.5 rounded-full border ${
+                            prominent.isProminent ? prominent.pillStyle : 'bg-blue-100 text-blue-800 border-blue-200'
+                          }`}>
                             {boardQuestionCounts[catKey] || 0} Questions Available
                           </span>
                           <span className="bg-slate-100 text-slate-600 text-xs font-semibold px-2 py-0.5 rounded-full border border-slate-200">
@@ -2486,12 +2618,19 @@ export default function ExamBank() {
                   {/* Category Items List */}
                   {isExpanded && (
                     <div className="divide-y divide-slate-100">
-                      {exams.map((exam) => (
+                      {exams.map((exam) => {
+                        const examProminent = getProminentExamMeta(exam.category || exam.title);
+                        return (
                         <div key={exam.id} className="p-4 md:p-6 hover:bg-slate-50/60 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div className="space-y-2 max-w-3xl">
                             <div className="flex flex-wrap items-center gap-2">
                               {getPlanBadge(exam.requiredPlan)}
-                              <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold rounded-full">
+                              <span className={`px-2.5 py-0.5 border text-[11px] font-extrabold rounded-full ${
+                                examProminent.isProminent ? examProminent.pillStyle : 'bg-blue-50 text-blue-700 border-blue-200'
+                              }`}>
+                                {exam.category}
+                              </span>
+                              <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-semibold rounded-full">
                                 {exam.domain}
                               </span>
                               <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${
@@ -2554,7 +2693,8 @@ export default function ExamBank() {
                             )}
                           </div>
                         </div>
-                      ))}
+                      );
+                    })}
                     </div>
                   )}
                 </div>

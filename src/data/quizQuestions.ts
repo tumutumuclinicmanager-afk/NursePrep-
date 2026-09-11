@@ -33,15 +33,15 @@ export const ENTRANCE_EXAMS = [
 ] as const;
 
 export const NURSING_EXAMS = [
-  'NCK',
   'NCLEX-RN',
   'NCLEX-PN',
-  'ATI RN',
-  'ATI LPN',
+  'Examplify RN',
+  'Examplify LPN',
   'HESI RN',
   'HESI LPN',
-  'Examplify RN',
-  'Examplify LPN'
+  'ATI RN',
+  'ATI LPN',
+  'NCK'
 ] as const;
 
 export const EXIT_EXAMS = [
@@ -56,10 +56,55 @@ export const EXAM_GROUPS: Record<string, readonly string[]> = {
   'Exit Exams': EXIT_EXAMS
 };
 
+export const POPULAR_EXAM_ORDER: readonly string[] = [
+  'ATI TEAS',
+  'HESI A2',
+  'NCLEX-RN',
+  'NCLEX-PN',
+  'Examplify RN',
+  'Examplify LPN',
+  'HESI RN',
+  'ATI RN',
+  'HESI LPN',
+  'ATI LPN',
+  'ATI Exit Exam',
+  'HESI Exit Exam',
+  'Examplify Exit Exam',
+  'NCK',
+  'ACCUPLACER',
+  'GED',
+  'HISET'
+];
+
+export function sortExamCategories(categories: string[]): string[] {
+  return [...categories].sort((a, b) => {
+    const idxA = POPULAR_EXAM_ORDER.indexOf(a);
+    const idxB = POPULAR_EXAM_ORDER.indexOf(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.localeCompare(b);
+  });
+}
+
 export const ALL_EXAM_TYPES = [
-  ...ENTRANCE_EXAMS,
-  ...NURSING_EXAMS,
-  ...EXIT_EXAMS
+  'ATI TEAS',
+  'HESI A2',
+  'NCLEX-RN',
+  'NCLEX-PN',
+  'Examplify RN',
+  'Examplify LPN',
+  'HESI RN',
+  'ATI RN',
+  'HESI LPN',
+  'ATI LPN',
+  'ATI Exit Exam',
+  'HESI Exit Exam',
+  'Examplify Exit Exam',
+  'NCK',
+  'ACCUPLACER',
+  'GED',
+  'HISET'
 ] as const;
 
 export function normalizeExamCategory(mode?: string): string {
