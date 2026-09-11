@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, BrainCircuit, Library, FileText, Bell, LogOut, ChevronRight, Menu, X, Video, MessageSquare, Edit3, Database, Award, Server, BarChart3, Clock, Sparkles, ShieldAlert, RotateCcw } from 'lucide-react';
+import { BookOpen, Home, Settings, GraduationCap, LayoutDashboard, Brain, BrainCircuit, Library, FileText, Bell, LogOut, ChevronRight, Menu, X, Video, MessageSquare, Edit3, Database, Award, Server, BarChart3, Clock, Sparkles, ShieldAlert, RotateCcw, Eye, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { auth, signOut, onAuthStateChanged } from '@/lib/firebase';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useTrialCountdown, setSimulatedTrialExpired } from '@/lib/trialManager';
+import { useExamFocusMode } from '@/lib/examFocusMode';
 
 export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student' | 'staff' | 'admin' }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userName, setUserName] = useState<string>('User');
   const [userEmail, setUserEmail] = useState<string>('');
+  const [isFocusMode, toggleFocusMode] = useExamFocusMode();
   const location = useLocation();
   const navigate = useNavigate();
   const { trial, refreshTrial } = useTrialCountdown(auth.currentUser);
@@ -97,23 +99,27 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
-      {/* Mobile Header (visible only on small screens) */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 sticky top-0 z-20">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
-            <Brain className="w-5 h-5" />
+      {/* Mobile Header (visible only on small screens and when NOT in exam focus mode) */}
+      {!isFocusMode && (
+        <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 sticky top-0 z-20">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
+              <Brain className="w-5 h-5" />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-blue-900 italic">Nurse Prep</span>
           </div>
-          <span className="text-xl font-bold tracking-tight text-blue-900 italic">Nurse Prep</span>
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
-          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
-      </div>
+      )}
 
-      {/* Sidebar Navigation */}
+      {/* Sidebar Navigation - pulled back during exam focus mode */}
       <aside className={cn(
-        "w-full md:w-64 bg-white border-r border-slate-200 flex-col flex-shrink-0 sticky top-0 md:h-screen z-10 transition-all duration-300 md:flex",
-        isMobileMenuOpen ? "flex fixed inset-0 top-[73px] h-[calc(100vh-73px)] z-20" : "hidden"
+        "w-full md:w-64 bg-white border-r border-slate-200 flex-col flex-shrink-0 sticky top-0 md:h-screen z-10 transition-all duration-300",
+        isFocusMode 
+          ? "hidden md:hidden" 
+          : (isMobileMenuOpen ? "flex fixed inset-0 top-[73px] h-[calc(100vh-73px)] z-20" : "hidden md:flex")
       )}>
         <div className="p-6 border-b border-slate-100 items-center gap-3 hidden md:flex">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
@@ -240,57 +246,84 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 flex flex-col h-[calc(100vh-73px)] md:h-screen overflow-hidden">
-        <header className="h-16 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold text-slate-900 capitalize">{userRole} Dashboard</h1>
-            {userRole === 'student' && (
-              <>
-                {trial.isPaid ? (
-                  <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-300 hidden md:inline-flex items-center gap-1">
-                    ✓ {trial.planName}
-                  </span>
-                ) : trial.isExpired ? (
-                  <span className="px-2.5 py-0.5 bg-rose-100 text-rose-800 text-xs font-bold rounded-full border border-rose-300 hidden md:inline-flex items-center gap-1">
-                    <ShieldAlert className="w-3 h-3 text-rose-600" /> Trial Expired (Repository Locked)
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-0.5 bg-amber-50 text-amber-800 text-xs font-bold rounded-full border border-amber-200 hidden md:inline-flex items-center gap-1.5">
-                    <Clock className="w-3 h-3 text-amber-600" /> Free Trial: {trial.daysRemaining}d {trial.hoursRemaining}h left
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-6">
-            <NotificationBell userRole={userRole} />
-            <div className="flex items-center gap-3 pl-6 border-l border-slate-200 hidden sm:flex">
-              <div className="text-right">
-                <p className="text-sm font-bold leading-none text-slate-900">{userName}</p>
-                <p className="text-[11px] font-semibold text-blue-600 leading-none mt-1">{accountTypeLabel}</p>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-blue-600 text-white border-2 border-white shadow-sm flex items-center justify-center font-extrabold text-sm overflow-hidden shrink-0">
-                 {getInitials(userName)}
+      <main className={cn(
+        "flex-1 min-w-0 flex flex-col overflow-hidden relative",
+        isFocusMode ? "h-screen w-full" : "h-[calc(100vh-73px)] md:h-screen"
+      )}>
+        {/* Standard Header (hidden in exam focus mode) */}
+        {!isFocusMode && (
+          <header className="h-16 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-semibold text-slate-900 capitalize">{userRole} Dashboard</h1>
+              {userRole === 'student' && (
+                <>
+                  {trial.isPaid ? (
+                    <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-300 hidden md:inline-flex items-center gap-1">
+                      ✓ {trial.planName}
+                    </span>
+                  ) : trial.isExpired ? (
+                    <span className="px-2.5 py-0.5 bg-rose-100 text-rose-800 text-xs font-bold rounded-full border border-rose-300 hidden md:inline-flex items-center gap-1">
+                      <ShieldAlert className="w-3 h-3 text-rose-600" /> Trial Expired (Repository Locked)
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 bg-amber-50 text-amber-800 text-xs font-bold rounded-full border border-amber-200 hidden md:inline-flex items-center gap-1.5">
+                      <Clock className="w-3 h-3 text-amber-600" /> Free Trial: {trial.daysRemaining}d {trial.hoursRemaining}h left
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-6">
+              <NotificationBell userRole={userRole} />
+              <div className="flex items-center gap-3 pl-6 border-l border-slate-200 hidden sm:flex">
+                <div className="text-right">
+                  <p className="text-sm font-bold leading-none text-slate-900">{userName}</p>
+                  <p className="text-[11px] font-semibold text-blue-600 leading-none mt-1">{accountTypeLabel}</p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-blue-600 text-white border-2 border-white shadow-sm flex items-center justify-center font-extrabold text-sm overflow-hidden shrink-0">
+                   {getInitials(userName)}
+                </div>
               </div>
             </div>
+          </header>
+        )}
+
+        {/* Floating Quick Bar for Exam Focus Mode to reveal Nav if desired */}
+        {isFocusMode && (
+          <div className="fixed top-2 right-4 z-50 flex items-center gap-2 bg-slate-900/90 backdrop-blur text-white px-3 py-1.5 rounded-full shadow-lg border border-slate-700 text-xs font-bold animate-in fade-in slide-in-from-top-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[11px] text-slate-200 hidden sm:inline">Exam Mode (Nav Hidden)</span>
+            <button
+              onClick={() => toggleFocusMode(false)}
+              className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-blue-300 hover:text-white rounded text-[10px] font-bold transition-colors"
+              title="Click to reveal standard navigation bars"
+            >
+              Show Nav
+            </button>
           </div>
-        </header>
-        <div className="flex-1 p-8 overflow-y-auto">
+        )}
+
+        <div className={cn(
+          "flex-1 overflow-y-auto",
+          isFocusMode ? "p-0 w-full h-full" : "p-4 md:p-8"
+        )}>
           <Outlet />
         </div>
         
-        {/* Status Bar */}
-        <footer className="h-10 bg-white border-t border-slate-200 px-8 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-          <div className="flex gap-6">
-            <span>Server Status: <span className="text-emerald-500">Optimal</span></span>
-            <span>User ID: NP-88219</span>
-          </div>
-          <div className="flex gap-6 hidden sm:flex">
-            <span className="text-blue-600">Terms of Service</span>
-            <span className="text-blue-600">Privacy Policy</span>
-            <span>&copy; {new Date().getFullYear()} Nurse Prep</span>
-          </div>
-        </footer>
+        {/* Status Bar (hidden during exam focus mode) */}
+        {!isFocusMode && (
+          <footer className="h-10 bg-white border-t border-slate-200 px-8 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="flex gap-6">
+              <span>Server Status: <span className="text-emerald-500">Optimal</span></span>
+              <span>User ID: NP-88219</span>
+            </div>
+            <div className="flex gap-6 hidden sm:flex">
+              <span className="text-blue-600">Terms of Service</span>
+              <span className="text-blue-600">Privacy Policy</span>
+              <span>&copy; {new Date().getFullYear()} Nurse Prep</span>
+            </div>
+          </footer>
+        )}
       </main>
     </div>
   );

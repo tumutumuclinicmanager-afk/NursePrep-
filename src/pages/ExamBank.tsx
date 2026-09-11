@@ -6,7 +6,8 @@ import {
   ArrowRight, DollarSign, ShoppingCart, Folder, FolderOpen, 
   ChevronRight, ChevronDown, ChevronLeft, ChevronUp, Clock, HelpCircle, CheckCircle, 
   Award, Grid, List, Play, Tag, Layers, RefreshCw, X, AlertCircle, Database,
-  Bookmark, BookmarkCheck, Trash2, Star, Lock, Crown, ShieldCheck, Calculator, GripVertical
+  Bookmark, BookmarkCheck, Trash2, Star, Lock, Crown, ShieldCheck, Calculator, GripVertical,
+  Maximize2, Minimize2, ShieldAlert, RotateCcw, Plus
 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
@@ -15,6 +16,7 @@ import { ALL_QUIZ_QUESTIONS, normalizeExamCategory, ALL_EXAM_TYPES, ENTRANCE_EXA
 import { normalizeQuestion } from '@/lib/utils';
 import { useTrialCountdown, setSimulatedTrialExpired } from '@/lib/trialManager';
 import { TrialExpiredExamLock } from '@/components/TrialExpiredExamLock';
+import { setExamFocusMode } from '@/lib/examFocusMode';
 
 const clinicalDomains = [
   'All Specialties',
@@ -533,10 +535,77 @@ export default function ExamBank() {
     }
   };
 
+  // Helper for tracking admin deleted exams across sample data and Firestore
+  const getDeletedExamIds = (): string[] => {
+    try {
+      return JSON.parse(localStorage.getItem('nurseprep_deleted_exams') || '[]');
+    } catch {
+      return [];
+    }
+  };
+
   // State for Firestore loaded exams
-  const [examsList, setExamsList] = useState<ExamItem[]>(defaultExamBundles);
+  const [examsList, setExamsList] = useState<ExamItem[]>(() => {
+    try {
+      const deletedIds = JSON.parse(localStorage.getItem('nurseprep_deleted_exams') || '[]');
+      return defaultExamBundles.filter(b => !deletedIds.includes(b.id));
+    } catch {
+      return defaultExamBundles;
+    }
+  });
   const [loadingDb, setLoadingDb] = useState(false);
   const [dbQuestionsCount, setDbQuestionsCount] = useState(0);
+
+  // Admin testing mode detection
+  const [isAdminUser, setIsAdminUser] = useState<boolean>(() => {
+    const role = localStorage.getItem('userRole');
+    return role === 'admin' || role === 'staff' || window.location.search.includes('admin') || localStorage.getItem('nurseprep_test_admin_mode') === 'true';
+  });
+
+  // Admin delete exam handler
+  const handleAdminDeleteExam = async (exam: ExamItem, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+
+    const confirmed = window.confirm(
+      `ADMIN TESTING MODE:\n\nAre you sure you want to delete "${exam.title}" (${exam.category})?\n\nThis will remove it from the live site.`
+    );
+    if (!confirmed) return;
+
+    // 1. Immediately remove from local state
+    setExamsList(prev => prev.filter(ex => ex.id !== exam.id));
+
+    // 2. Persist deleted ID so standard bundles and cached exams stay deleted
+    try {
+      const deleted = getDeletedExamIds();
+      if (!deleted.includes(exam.id)) {
+        deleted.push(exam.id);
+        localStorage.setItem('nurseprep_deleted_exams', JSON.stringify(deleted));
+      }
+    } catch (err) {
+      console.warn('Error updating deleted exams list:', err);
+    }
+
+    // 3. Delete from Firestore collection if present
+    try {
+      await deleteDoc(doc(db, 'exams', exam.id));
+    } catch (err) {
+      console.warn('Firestore doc delete note:', err);
+    }
+
+    setFavoriteToast(`Exam "${exam.title}" has been deleted.`);
+    setTimeout(() => setFavoriteToast(null), 4000);
+  };
+
+  const handleResetSampleExamsAdmin = () => {
+    if (!window.confirm("Restore all sample exams? This clears the test deletion history.")) return;
+    localStorage.removeItem('nurseprep_deleted_exams');
+    fetchAllExamsAndQuestions();
+    setFavoriteToast("All default exams restored.");
+    setTimeout(() => setFavoriteToast(null), 3000);
+  };
 
   // Favorites / Bookmarks state
   const [favoritesList, setFavoritesList] = useState<FavoriteItem[]>([]);
@@ -564,6 +633,18 @@ export default function ExamBank() {
   const [showRationale, setShowRationale] = useState<Record<number, boolean>>({});
   const [examCompleted, setExamCompleted] = useState(false);
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<number>>(new Set());
+
+  // Sync focus mode: pull back navigation bar when student is in practice exam
+  useEffect(() => {
+    if (practiceExam) {
+      setExamFocusMode(true);
+    } else {
+      setExamFocusMode(false);
+    }
+    return () => {
+      setExamFocusMode(false);
+    };
+  }, [practiceExam]);
 
   const toggleFlagQuestion = (idx: number) => {
     setFlaggedQuestions(prev => {
@@ -882,8 +963,11 @@ export default function ExamBank() {
         questionLimits: { free: 5, basic: 25, gold: 0, platinum: 0 }
       }));
 
-      // Merge all exam items
-      const combinedExams = [...dbExams, ...dynamicBoardExams, ...defaultExamBundles];
+      // Merge all exam items excluding admin-deleted ones
+      const deletedIds = getDeletedExamIds();
+      const combinedExams = [...dbExams, ...dynamicBoardExams, ...defaultExamBundles].filter(
+        ex => !deletedIds.includes(ex.id)
+      );
       setExamsList(combinedExams);
 
       // Collect all unique categories dynamically
@@ -1521,6 +1605,18 @@ export default function ExamBank() {
                         <><Play className="w-4 h-4 fill-white" /> Start Practice</>
                       )}
                     </Button>
+
+                    {isAdminUser && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => handleAdminDeleteExam(exam, e)}
+                        className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 gap-1.5 shrink-0"
+                        title="Admin Testing Mode: Delete Exam"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Delete
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1535,21 +1631,29 @@ export default function ExamBank() {
 
   if (practiceExam) {
     return (
-      <div className="min-h-screen bg-slate-50/50 pb-20">
-        <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6 animate-in fade-in">
-        <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-lg flex items-center justify-between">
+      <div className="min-h-screen bg-slate-50/50 pb-20 w-full">
+        <div className="w-full max-w-6xl mx-auto p-3 sm:p-6 md:p-8 space-y-6 animate-in fade-in">
+        <div className="bg-slate-900 text-white rounded-2xl p-5 md:p-6 shadow-lg flex items-center justify-between gap-4">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400 block">
-              {practiceExam.category} • {practiceExam.domain}
-            </span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400 block">
+                {practiceExam.category} • {practiceExam.domain}
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                <Maximize2 className="w-2.5 h-2.5" /> Full-Screen Exam Active (Nav Bar Pulled Back)
+              </span>
+            </div>
             <h2 className="text-xl md:text-2xl font-extrabold tracking-tight mt-1">{practiceExam.title}</h2>
           </div>
           <Button 
             variant="outline"
-            onClick={() => setPracticeExam(null)}
-            className="text-white border-slate-700 hover:bg-slate-800 gap-2"
+            onClick={() => {
+              setExamFocusMode(false);
+              setPracticeExam(null);
+            }}
+            className="text-white border-slate-700 hover:bg-slate-800 gap-2 shrink-0"
           >
-            <ChevronLeft className="w-4 h-4" /> Exit to Exam Bank
+            <ChevronLeft className="w-4 h-4" /> Exit Exam
           </Button>
         </div>
 
@@ -1928,6 +2032,44 @@ export default function ExamBank() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
+      {/* Admin Testing Mode Banner */}
+      {isAdminUser && (
+        <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 text-white p-4 sm:p-5 rounded-2xl border border-rose-800/80 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-600/80 flex items-center justify-center font-bold text-white shrink-0 shadow-xs">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-rose-400">Admin Testing Phase Active</span>
+                <span className="text-[10px] bg-rose-500/30 text-rose-200 px-2 py-0.5 rounded-full font-bold border border-rose-500/40">Full Control</span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                You can test, review, and delete any exam from the live site during this phase. Delete buttons are active on all cards.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetSampleExamsAdmin}
+              className="text-xs text-slate-200 border-slate-700 hover:bg-slate-800 gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-400" /> Reset Default Exams
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => navigate('/staff/upload')}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold gap-1.5 shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" /> Upload / Extract Exam
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-6 md:p-10 shadow-lg border border-slate-800 relative overflow-hidden">
         <div className="relative z-10 max-w-3xl space-y-4">
@@ -2360,6 +2502,18 @@ export default function ExamBank() {
                                 <><Play className="w-4 h-4 fill-white" /> Start Practice</>
                               )}
                             </Button>
+
+                            {isAdminUser && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => handleAdminDeleteExam(exam, e)}
+                                className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 gap-1.5 shrink-0"
+                                title="Admin Testing Mode: Delete Exam"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Delete
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}

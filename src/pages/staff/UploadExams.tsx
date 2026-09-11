@@ -8,6 +8,7 @@ import { extractExamQuestionsUniversal, parseExamQuestionsFromText, isRawPdfByte
 import QuestionBuilder from '@/components/staff/QuestionBuilder';
 import QuestionRepository from '@/components/staff/QuestionRepository';
 import ExamPublisher from '@/components/staff/ExamPublisher';
+import ExtractedExamWorkflow from '@/components/staff/ExtractedExamWorkflow';
 
 const DEFAULT_EXAM_TYPES = [
   'ATI TEAS',
@@ -249,7 +250,7 @@ export default function UploadExams() {
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
-          <Upload className="w-4 h-4" /> PDF Extractor
+          <Upload className="w-4 h-4" /> Multi-Phase Exam Extractor
         </button>
 
         <button
@@ -274,8 +275,11 @@ export default function UploadExams() {
         <QuestionBuilder onQuestionSaved={() => setRefreshRepoTrigger(prev => prev + 1)} />
       )}
 
-      {/* Tab 2: Bulk PDF & Document Extractor */}
+      {/* Tab 2: Multi-Phase Bulk PDF & Document Extractor Workflow */}
       {activeTab === 'pdf' && (
+        <ExtractedExamWorkflow onExamPublished={() => setRefreshRepoTrigger(prev => prev + 1)} />
+      )}
+      {false && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
