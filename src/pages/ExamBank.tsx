@@ -564,22 +564,23 @@ export default function ExamBank() {
       setSelectedExamGroup('All');
       setSelectedDomain('All Specialties');
       setSelectedDifficulty('All');
-      setSelectedExamTypePage(null);
+      setSearchQuery('');
 
       if (catLower.includes('hesi')) {
-        setSearchQuery('HESI');
-        setSelectedBoard('All');
+        setSelectedExamTypePage('HESI A2');
+        setSelectedBoard('HESI A2');
       } else if (catLower.includes('teas') || catLower.includes('ati')) {
-        setSearchQuery('ATI');
-        setSelectedBoard('All');
+        setSelectedExamTypePage('ATI TEAS');
+        setSelectedBoard('ATI TEAS');
       } else if (catLower.includes('nclex')) {
-        setSearchQuery('NCLEX');
-        setSelectedBoard('All');
+        setSelectedExamTypePage('NCLEX-RN');
+        setSelectedBoard('NCLEX-RN');
       } else if (catLower.includes('examplify')) {
-        setSearchQuery('Examplify');
-        setSelectedBoard('All');
+        setSelectedExamTypePage('Examplify RN');
+        setSelectedBoard('Examplify RN');
       } else {
-        setSearchQuery(categoryParam);
+        setSelectedExamTypePage(categoryParam);
+        setSelectedBoard(categoryParam);
       }
     } else if (searchParam) {
       setSearchQuery(searchParam);
