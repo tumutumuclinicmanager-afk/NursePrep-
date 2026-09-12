@@ -7,7 +7,7 @@ import {
   ChevronRight, ChevronDown, ChevronLeft, ChevronUp, Clock, HelpCircle, CheckCircle, 
   Award, Grid, List, Play, Tag, Layers, RefreshCw, X, AlertCircle, Database,
   Bookmark, BookmarkCheck, Trash2, Star, Lock, Crown, ShieldCheck, Calculator, GripVertical,
-  Maximize2, Minimize2, ShieldAlert, RotateCcw, Plus
+  Maximize2, Minimize2, ShieldAlert, RotateCcw, Plus, Edit
 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
@@ -17,6 +17,7 @@ import { normalizeQuestion } from '@/lib/utils';
 import { useTrialCountdown, setSimulatedTrialExpired } from '@/lib/trialManager';
 import { TrialExpiredExamLock } from '@/components/TrialExpiredExamLock';
 import { setExamFocusMode } from '@/lib/examFocusMode';
+import { ExamEditorModal } from '@/components/admin/ExamEditorModal';
 
 const clinicalDomains = [
   'All Specialties',
@@ -676,7 +677,10 @@ export default function ExamBank() {
   const [examsList, setExamsList] = useState<ExamItem[]>(() => {
     try {
       const deletedIds = JSON.parse(localStorage.getItem('nurseprep_deleted_exams') || '[]');
-      return defaultExamBundles.filter(b => !deletedIds.includes(b.id));
+      const editedMap = JSON.parse(localStorage.getItem('nurseprep_custom_edited_exams') || '{}');
+      return defaultExamBundles
+        .filter(b => !deletedIds.includes(b.id))
+        .map(b => editedMap[b.id] ? { ...b, ...editedMap[b.id] } : b);
     } catch {
       return defaultExamBundles;
     }
@@ -687,8 +691,45 @@ export default function ExamBank() {
   // Admin testing mode detection
   const [isAdminUser, setIsAdminUser] = useState<boolean>(() => {
     const role = localStorage.getItem('userRole');
-    return role === 'admin' || role === 'staff' || window.location.search.includes('admin') || localStorage.getItem('nurseprep_test_admin_mode') === 'true';
+    const email = auth.currentUser?.email || '';
+    return role === 'admin' || role === 'staff' || email === 'wangechigodfrey77@gmail.com' || window.location.search.includes('admin') || localStorage.getItem('nurseprep_test_admin_mode') === 'true';
   });
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      if (user) {
+        const role = localStorage.getItem('userRole');
+        if (role === 'admin' || role === 'staff' || user.email === 'wangechigodfrey77@gmail.com') {
+          setIsAdminUser(true);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Admin edit entire exam state
+  const [editingExamItem, setEditingExamItem] = useState<ExamItem | null>(null);
+
+  const handleAdminEditExam = (exam: ExamItem, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setEditingExamItem(exam);
+  };
+
+  const handleSaveEditedExam = (updatedExamData: any) => {
+    setExamsList(prev => {
+      const exists = prev.some(e => e.id === updatedExamData.id);
+      if (exists) {
+        return prev.map(e => e.id === updatedExamData.id ? { ...e, ...updatedExamData } : e);
+      } else {
+        return [updatedExamData, ...prev];
+      }
+    });
+    setFavoriteToast(`Exam "${updatedExamData.title}" updated successfully.`);
+    setTimeout(() => setFavoriteToast(null), 4000);
+  };
 
   // Admin delete exam handler
   const handleAdminDeleteExam = async (exam: ExamItem, e?: React.MouseEvent) => {
@@ -1433,6 +1474,16 @@ export default function ExamBank() {
 
   const modalsContent = (
     <>
+      {/* Admin Full Exam Editor Modal */}
+      {editingExamItem && (
+        <ExamEditorModal
+          isOpen={!!editingExamItem}
+          onClose={() => setEditingExamItem(null)}
+          exam={editingExamItem}
+          onSave={handleSaveEditedExam}
+        />
+      )}
+
       {/* Subscription Required Lock Modal */}
       {requiredPlanModalExam && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
@@ -1754,15 +1805,26 @@ export default function ExamBank() {
                     </Button>
 
                     {isAdminUser && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => handleAdminDeleteExam(exam, e)}
-                        className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 gap-1.5 shrink-0"
-                        title="Admin Testing Mode: Delete Exam"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Delete
-                      </Button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => handleAdminEditExam(exam, e)}
+                          className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 gap-1.5"
+                          title="Admin: Edit entire exam blueprint, questions, choices, and rationales"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-blue-500" /> Edit Exam
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => handleAdminDeleteExam(exam, e)}
+                          className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 gap-1.5"
+                          title="Admin Testing Mode: Delete Exam"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Delete
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2188,16 +2250,43 @@ export default function ExamBank() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-rose-400">Admin Testing Phase Active</span>
-                <span className="text-[10px] bg-rose-500/30 text-rose-200 px-2 py-0.5 rounded-full font-bold border border-rose-500/40">Full Control</span>
+                <span className="text-xs font-black uppercase tracking-wider text-rose-400">Admin Mode Active</span>
+                <span className="text-[10px] bg-rose-500/30 text-rose-200 px-2 py-0.5 rounded-full font-bold border border-rose-500/40">Full Exam Control</span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                You can test, review, and delete any exam from the live site during this phase. Delete buttons are active on all cards.
+                You can edit entire exams (title, categories, questions, answer options, rationales, time limits, and plan tiers), create new exams, or delete exams.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingExamItem({
+                  id: `exam-custom-${Date.now()}`,
+                  title: 'New Clinical Exam',
+                  category: 'NCLEX-RN',
+                  domain: 'Medical-Surgical Nursing',
+                  difficulty: 'Medium',
+                  durationMinutes: 60,
+                  requiredPlan: 'free',
+                  isPublished: true,
+                  features: ['Lecturer Authored', 'Verified Rationales', 'Timed Simulation'],
+                  questions: [],
+                  price: 'Free Access',
+                  numericPrice: 0,
+                  questionCount: 0,
+                  isPremium: false,
+                  icon: Brain,
+                  color: 'text-blue-600',
+                  bg: 'bg-blue-50'
+                });
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold gap-1.5 shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" /> Create New Exam
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -2682,15 +2771,26 @@ export default function ExamBank() {
                             </Button>
 
                             {isAdminUser && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => handleAdminDeleteExam(exam, e)}
-                                className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 gap-1.5 shrink-0"
-                                title="Admin Testing Mode: Delete Exam"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Delete
-                              </Button>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => handleAdminEditExam(exam, e)}
+                                  className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 gap-1.5"
+                                  title="Admin: Edit entire exam blueprint, questions, choices, and rationales"
+                                >
+                                  <Edit className="w-3.5 h-3.5 text-blue-500" /> Edit Exam
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => handleAdminDeleteExam(exam, e)}
+                                  className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 gap-1.5"
+                                  title="Admin Testing Mode: Delete Exam"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Delete
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </div>

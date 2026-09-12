@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { QuestionData } from '@/types';
+import { ExamEditorModal } from '@/components/admin/ExamEditorModal';
 
 export interface ExamDoc {
   id?: string;
@@ -93,6 +94,28 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [autoLinkCategoryQuestions, setAutoLinkCategoryQuestions] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Full Exam Editor state
+  const [fullEditorExam, setFullEditorExam] = useState<any | null>(null);
+
+  const handleOpenFullExamEditor = (exam: ExamDoc) => {
+    setFullEditorExam({
+      id: exam.id || `exam-${Date.now()}`,
+      title: exam.title,
+      category: exam.category,
+      domain: exam.domain,
+      description: exam.description,
+      requiredPlan: exam.requiredPlan,
+      questionLimits: exam.questionLimits,
+      isPublished: exam.isPublished,
+      questions: exam.questions || []
+    });
+  };
+
+  const handleSavedFromFullEditor = (saved: any) => {
+    setExams(prev => prev.map(e => e.id === saved.id ? { ...e, ...saved } : e));
+    fetchExamsAndQuestions();
+  };
 
   const fetchExamsAndQuestions = async () => {
     try {
@@ -612,10 +635,20 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => handleOpenEditModal(exam)}
-                      className="text-xs font-bold gap-1"
+                      onClick={() => handleOpenFullExamEditor(exam)}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 gap-1"
+                      title="Edit entire exam: title, categories, questions, options, and rationales"
                     >
-                      <Edit className="w-3.5 h-3.5" /> Edit Config
+                      <Edit className="w-3.5 h-3.5 text-blue-500" /> Edit Entire Exam
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleOpenEditModal(exam)}
+                      className="text-xs font-bold gap-1 text-slate-600"
+                      title="Quick edit access limits & plan tier"
+                    >
+                      Quick Config
                     </Button>
                     <Button 
                       variant="outline" 
@@ -836,6 +869,16 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
             </form>
           </div>
         </div>
+      )}
+
+      {/* Full Exam Editor Modal */}
+      {fullEditorExam && (
+        <ExamEditorModal
+          isOpen={!!fullEditorExam}
+          onClose={() => setFullEditorExam(null)}
+          exam={fullEditorExam}
+          onSave={handleSavedFromFullEditor}
+        />
       )}
     </div>
   );
