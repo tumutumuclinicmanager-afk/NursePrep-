@@ -108,9 +108,19 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
             </div>
             <span className="text-xl font-bold tracking-tight text-blue-900 italic">Nurse Prep</span>
           </div>
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition-colors cursor-pointer"
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5 text-slate-500" />
+              <span>Sign Out</span>
+            </button>
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer">
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
       )}
 
@@ -126,6 +136,26 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
             <Brain className="w-5 h-5" />
           </div>
           <span className="text-xl font-bold tracking-tight text-blue-900 italic">Nurse Prep</span>
+        </div>
+
+        {/* Mobile menu user info card when open */}
+        <div className="p-3.5 border-b border-slate-100 flex md:hidden items-center justify-between bg-slate-50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+              {getInitials(userName)}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-900 leading-none">{userName}</p>
+              <p className="text-[10px] text-blue-600 font-semibold leading-none mt-1">{accountTypeLabel}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign Out
+          </button>
         </div>
         
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -237,9 +267,9 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
           </div>
         )}
         
-        <div className="p-4 border-t border-slate-100 shrink-0 mt-auto">
-          <Button onClick={handleSignOut} variant="ghost" className="w-full justify-start gap-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50">
-            <LogOut className="w-4 h-4" />
+        <div className="p-4 border-t border-slate-100 shrink-0 mt-auto bg-white">
+          <Button onClick={handleSignOut} variant="outline" className="w-full justify-start gap-2 text-slate-700 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 text-xs font-bold transition-colors cursor-pointer">
+            <LogOut className="w-4 h-4 text-slate-500 hover:text-rose-600" />
             Sign Out
           </Button>
         </div>
@@ -273,16 +303,30 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
                 </>
               )}
             </div>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 sm:gap-4 md:gap-5">
               <NotificationBell userRole={userRole} />
-              <div className="flex items-center gap-3 pl-6 border-l border-slate-200 hidden sm:flex">
-                <div className="text-right">
+              <div className="flex items-center gap-2.5 sm:gap-3 pl-3 sm:pl-5 border-l border-slate-200">
+                <div className="text-right hidden sm:block">
                   <p className="text-sm font-bold leading-none text-slate-900">{userName}</p>
                   <p className="text-[11px] font-semibold text-blue-600 leading-none mt-1">{accountTypeLabel}</p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-blue-600 text-white border-2 border-white shadow-sm flex items-center justify-center font-extrabold text-sm overflow-hidden shrink-0">
+                <div 
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-600 text-white border-2 border-white shadow-sm flex items-center justify-center font-extrabold text-xs sm:text-sm overflow-hidden shrink-0"
+                  title={`${userName} (${accountTypeLabel})`}
+                >
                    {getInitials(userName)}
                 </div>
+
+                {/* Highly Visible Sign Out Button in the Top Header */}
+                <button
+                  id="header-signout-btn"
+                  onClick={handleSignOut}
+                  className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 text-xs font-bold text-slate-700 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition-all shadow-2xs cursor-pointer ml-1"
+                  title="Sign out of your account"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-slate-500 hover:text-rose-600" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </button>
               </div>
             </div>
           </header>

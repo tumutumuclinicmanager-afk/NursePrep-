@@ -10,6 +10,7 @@ interface NurseLoadingAnimationProps {
   showStatus?: boolean;
   showProgress?: boolean;
   className?: string;
+  compact?: boolean;
 }
 
 export default function NurseLoadingAnimation({
@@ -20,9 +21,10 @@ export default function NurseLoadingAnimation({
   showStatus = false,
   showProgress = false,
   className = "",
+  compact = false,
 }: NurseLoadingAnimationProps) {
   return (
-    <div className={`nurse-loading-container ${className}`}>
+    <div className={`nurse-loading-container ${compact ? 'compact' : ''} ${className}`}>
       <div className="nurse-artwork-wrapper">
         <div className="nurse-pulse-ring"></div>
         <img

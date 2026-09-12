@@ -15,6 +15,43 @@
   overflow: hidden;
 }
 
+/* Compact mode for centered modal/card headers */
+.nurse-loading-container.compact {
+  padding: 1.25rem 1rem 0.5rem;
+  background: transparent;
+  box-shadow: none;
+  max-width: 100%;
+  border-radius: 0;
+}
+
+.nurse-loading-container.compact .nurse-artwork-wrapper {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 0.625rem;
+}
+
+.nurse-loading-container.compact .nurse-artwork {
+  width: 72px;
+  height: 72px;
+  border-width: 3px;
+  box-shadow: 0 6px 16px -3px rgba(37, 99, 235, 0.25);
+}
+
+.nurse-loading-container.compact .nurse-loading-title {
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.nurse-loading-container.compact .nurse-loading-subtitle {
+  font-size: 0.8125rem;
+  margin-bottom: 0.25rem;
+  line-height: 1.35;
+  color: #64748b;
+  max-width: 320px;
+}
+
 .nurse-artwork-wrapper {
   position: relative;
   width: 160px;

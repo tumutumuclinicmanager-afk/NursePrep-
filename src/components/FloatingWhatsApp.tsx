@@ -27,20 +27,20 @@ export function FloatingWhatsApp() {
       <aside
         id="floating-whatsapp-minimized"
         aria-label="WhatsApp Contact"
-        className="fixed left-2 sm:left-4 bottom-5 sm:bottom-6 z-40 transition-transform duration-200"
+        className="fixed top-[70px] sm:top-[72px] right-3 sm:right-6 md:right-8 z-30 transition-transform duration-200"
       >
         <button
           onClick={() => setIsMinimized(false)}
-          className="group flex items-center gap-2 p-2.5 sm:p-3 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-full shadow-lg hover:shadow-xl border-2 border-white/90 transition-all hover:scale-105 cursor-pointer"
+          className="group flex items-center gap-2 px-3 py-1.5 sm:py-2 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-full shadow-lg hover:shadow-xl border-2 border-white/90 transition-all hover:scale-105 cursor-pointer"
           title="Open WhatsApp contact banner (+1 843 843 7212)"
           aria-label="Open WhatsApp contact banner"
         >
           <span className="relative flex items-center justify-center">
-            <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 fill-white" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-300 rounded-full animate-ping" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-200 rounded-full" />
+            <MessageCircle className="w-4 h-4 sm:w-4.5 sm:h-4.5 fill-white" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-300 rounded-full animate-ping" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-200 rounded-full" />
           </span>
-          <span className="hidden sm:inline text-xs font-black tracking-wide pr-1">
+          <span className="text-xs font-black tracking-wide pr-0.5">
             WhatsApp
           </span>
         </button>
@@ -52,9 +52,9 @@ export function FloatingWhatsApp() {
     <aside
       id="floating-whatsapp-banner"
       aria-label="WhatsApp Contact Banner"
-      className="fixed left-2 sm:left-4 bottom-5 sm:bottom-6 z-40 max-w-[calc(100vw-1rem)] transition-all duration-300 animate-in fade-in slide-in-from-left-4"
+      className="fixed top-[70px] sm:top-[72px] right-3 sm:right-6 md:right-8 z-30 max-w-[calc(100vw-1.5rem)] transition-all duration-300 animate-in fade-in slide-in-from-top-2"
     >
-      <div className="relative group bg-slate-900/95 backdrop-blur-md text-white rounded-2xl shadow-xl border border-emerald-500/40 p-2 sm:p-2.5 flex items-center gap-2.5 sm:gap-3 hover:border-emerald-400 transition-all">
+      <div className="relative group bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-xl shadow-slate-900/15 border border-emerald-500/40 p-2 sm:p-2.5 flex items-center gap-2.5 sm:gap-3 hover:border-emerald-400 transition-all">
         {/* Clickable WhatsApp link trigger */}
         <a
           href={whatsappUrl}
@@ -78,7 +78,7 @@ export function FloatingWhatsApp() {
               <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 cursor-help" title="Available 24/7">
                 WhatsApp
               </span>
-              <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/tooltip:block bg-slate-900 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md shadow-xl border border-emerald-500/40 whitespace-nowrap z-50 animate-in fade-in">
+              <div className="absolute top-full right-0 mt-1.5 hidden group-hover/tooltip:block bg-slate-900 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md shadow-xl border border-emerald-500/40 whitespace-nowrap z-50 animate-in fade-in">
                 Available 24/7
               </div>
               <span className="inline-block w-1 h-1 rounded-full bg-emerald-400" />
@@ -100,7 +100,7 @@ export function FloatingWhatsApp() {
         <div className="flex items-center gap-0.5 border-l border-slate-700/80 pl-1.5 shrink-0">
           <button
             onClick={handleCopy}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             title={copied ? "Copied!" : "Copy phone number"}
             aria-label="Copy phone number"
           >
@@ -112,7 +112,7 @@ export function FloatingWhatsApp() {
           </button>
           <button
             onClick={() => setIsMinimized(true)}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             title="Minimize WhatsApp banner"
             aria-label="Minimize WhatsApp banner"
           >
