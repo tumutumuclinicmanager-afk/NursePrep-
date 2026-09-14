@@ -349,7 +349,7 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
 
         <div className={cn(
           "flex-1 overflow-y-auto",
-          isFocusMode ? "p-0 w-full h-full" : "p-4 md:p-8"
+          isFocusMode ? "p-0 w-full h-full" : "p-3 sm:p-4 md:p-5"
         )}>
           <Outlet />
         </div>

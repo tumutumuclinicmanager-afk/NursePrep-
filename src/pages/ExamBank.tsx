@@ -2240,7 +2240,7 @@ export default function ExamBank() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
+    <div className="max-w-7xl mx-auto space-y-2.5 sm:space-y-3">
       {/* Admin Testing Mode Banner */}
       {isAdminUser && (
         <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 text-white p-4 sm:p-5 rounded-2xl border border-rose-800/80 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -2306,53 +2306,58 @@ export default function ExamBank() {
         </div>
       )}
 
-      {/* Header Banner - Sleek Compact Ribbon */}
-      <div className="bg-slate-900 text-white rounded-xl px-4 py-2.5 sm:px-5 sm:py-3 shadow-2xs border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 text-blue-400 flex items-center justify-center shrink-0">
-            <Layers className="w-4 h-4" />
+      {/* Header Banner - Ultra-Sleek Compact Micro-Ribbon */}
+      <div className="bg-slate-900 text-white rounded-xl px-3.5 py-2 sm:px-4 sm:py-2 shadow-2xs border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-6 h-6 rounded-md bg-blue-500/20 border border-blue-400/30 text-blue-400 flex items-center justify-center shrink-0">
+            <Layers className="w-3.5 h-3.5" />
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">Exam Bank & Repository</h1>
-              <span className="text-[10px] font-bold text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded-full border border-blue-400/30 hidden sm:inline">
-                Curriculum Hub
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 truncate hidden md:block">
-              Priority testing repositories: ATI TEAS, HESI A2, NCLEX, Examplify & clinical specialties.
-            </p>
-          </div>
+          <h1 className="text-xs sm:text-sm font-black text-white tracking-tight truncate">Exam Bank & Repository</h1>
+          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold rounded-full border border-emerald-400/30 inline-flex items-center gap-1 shrink-0">
+            <Activity className="w-2.5 h-2.5 text-emerald-400" /> {boardQuestionCounts['All'] || 0} Questions Live
+          </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs shrink-0">
+        <div className="flex items-center gap-1.5 text-xs shrink-0 flex-wrap sm:flex-nowrap">
+          {/* Compact Sync Button */}
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={fetchAllExamsAndQuestions}
+            disabled={loadingDb}
+            className="text-[10px] font-bold gap-1 h-6 px-2 text-slate-200 border-slate-700 bg-slate-800/80 hover:bg-slate-700 hover:text-white shrink-0 cursor-pointer"
+            title="Sync verified questions from repository"
+          >
+            <RefreshCw className={`w-2.5 h-2.5 text-blue-400 ${loadingDb ? 'animate-spin' : ''}`} /> Sync ({dbQuestionsCount})
+          </Button>
+
           {trial.isPaid ? (
-            <span className="px-2.5 py-1 rounded-lg font-extrabold text-[11px] bg-emerald-600 text-white uppercase tracking-wider flex items-center gap-1 shadow-2xs">
-              <ShieldCheck className="w-3.5 h-3.5" /> {userSubscriptionPlan.toUpperCase()} (UNLIMITED)
+            <span className="px-2 py-0.5 rounded-md font-extrabold text-[10px] bg-emerald-600 text-white uppercase tracking-wider flex items-center gap-1 shadow-2xs">
+              <ShieldCheck className="w-3 h-3" /> {userSubscriptionPlan.toUpperCase()}
             </span>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <span className="px-2.5 py-1 rounded-lg font-bold text-[11px] bg-amber-400 text-slate-950 uppercase tracking-wider flex items-center gap-1 shadow-2xs">
-                <Clock className="w-3.5 h-3.5" /> {trial.daysRemaining}d {trial.hoursRemaining}h LEFT
+            <div className="flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-400 text-slate-950 uppercase tracking-wider flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5" /> {trial.daysRemaining}d {trial.hoursRemaining}h
               </span>
               <button
                 onClick={async () => {
                   await setSimulatedTrialExpired(true, auth.currentUser);
                   await refreshTrial();
                 }}
-                className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-[10px] font-medium transition-colors"
-                title="Simulate what happens when the 14 days finish"
+                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-[9px] font-medium transition-colors cursor-pointer"
+                title="Simulate expiration"
               >
                 Expire
               </button>
             </div>
           )}
 
-          <div className="inline-flex items-center gap-1 p-0.5 bg-slate-800/90 rounded-lg border border-slate-700 text-[11px]">
+          <div className="inline-flex items-center gap-0.5 p-0.5 bg-slate-800/90 rounded-md border border-slate-700 text-[10px]">
             {[
               { label: 'All Plans', val: 'All' },
               { label: 'My Plan', val: 'My Plan Access' },
-              { label: 'Free Tier', val: 'free' },
+              { label: 'Free', val: 'free' },
               { label: 'Basic', val: 'basic' },
               { label: 'Gold', val: 'gold' },
               { label: 'Platinum', val: 'platinum' }
@@ -2360,7 +2365,7 @@ export default function ExamBank() {
               <button
                 key={item.val}
                 onClick={() => setSelectedPlanFilter(item.val as any)}
-                className={`px-2 py-0.5 rounded-md font-bold transition-all ${
+                className={`px-1.5 py-0.5 rounded font-bold transition-all text-[10px] cursor-pointer ${
                   selectedPlanFilter === item.val
                     ? 'bg-blue-600 text-white shadow-2xs'
                     : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
@@ -2405,155 +2410,183 @@ export default function ExamBank() {
         </div>
       )}
 
-      {/* Live Question Bank Inventory Bar - Compact */}
-      <div className="bg-white border border-slate-200/80 rounded-xl px-4 py-2 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">
-            <Database className="w-4 h-4" />
+      {/* All Exam Categories - Compact, High-Density Curriculum Deck */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-3 sm:p-3.5 space-y-2.5">
+        {/* Header Row: Title, active filter chip, and group filters in a single tight row */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <div className="w-6 h-6 rounded-md bg-blue-600 text-white flex items-center justify-center shrink-0">
+              <Layers className="w-3.5 h-3.5" />
+            </div>
+            <h2 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
+              Exam Categories & Curriculums
+            </h2>
+            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold">
+              {dynamicBoardCategories.length} Boards
+            </span>
+            {selectedBoard !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-100/80 text-blue-900 border border-blue-200 text-[10px] font-bold">
+                Filtered: {selectedBoard}
+                <button 
+                  onClick={() => {
+                    setSelectedBoard('All');
+                    setSelectedExamTypePage(null);
+                  }}
+                  className="hover:text-red-600 transition-colors ml-0.5 cursor-pointer font-black"
+                  title="Clear board filter"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-xs sm:text-sm font-extrabold text-slate-900">Live Inventory:</h2>
-            <span className="text-xs text-slate-600">
-              <strong className="text-slate-900 font-black">{boardQuestionCounts['All'] || 0}</strong> verified questions in repository
-            </span>
-            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200 inline-flex items-center gap-1">
-              <Activity className="w-2.5 h-2.5" /> Live
-            </span>
+
+          {/* High-Level Exam Group Filter Tabs */}
+          <div className="inline-flex items-center gap-0.5 p-0.5 bg-slate-100/90 rounded-lg border border-slate-200 shrink-0">
+            {(['All', 'Entrance Exams', 'Nursing Exams', 'Exit Exams'] as const).map(group => {
+              const isActive = selectedExamGroup === group;
+              let countText = '';
+              if (group === 'Entrance Exams') countText = `${ENTRANCE_EXAMS.length}`;
+              if (group === 'Nursing Exams') countText = `${NURSING_EXAMS.length}`;
+              if (group === 'Exit Exams') countText = `${EXIT_EXAMS.length}`;
+
+              return (
+                <button
+                  key={group}
+                  onClick={() => {
+                    setSelectedExamGroup(group);
+                    setSelectedBoard('All');
+                  }}
+                  className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                  }`}
+                >
+                  <span>{group === 'All' ? 'All Boards' : group.replace(' Exams', '')}</span>
+                  {countText && (
+                    <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-full ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
+                    }`}>
+                      {countText}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={fetchAllExamsAndQuestions}
-          disabled={loadingDb}
-          className="text-xs font-bold gap-1.5 h-7 px-2.5 text-slate-700 hover:text-blue-600 shrink-0 self-end sm:self-auto"
-        >
-          <RefreshCw className={`w-3 h-3 ${loadingDb ? 'animate-spin' : ''}`} /> Sync Bank ({dbQuestionsCount} Live)
-        </Button>
-      </div>
-
-      {/* High-Level Exam Group Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200">
-        {(['All', 'Entrance Exams', 'Nursing Exams', 'Exit Exams'] as const).map(group => {
-          const isActive = selectedExamGroup === group;
-          let countText = '';
-          if (group === 'Entrance Exams') countText = `(${ENTRANCE_EXAMS.length})`;
-          if (group === 'Nursing Exams') countText = `(${NURSING_EXAMS.length})`;
-          if (group === 'Exit Exams') countText = `(${EXIT_EXAMS.length})`;
-
-          return (
-            <button
-              key={group}
-              onClick={() => {
-                setSelectedExamGroup(group);
-                setSelectedBoard('All');
-              }}
-              className={`px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-1.5 ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-              }`}
-            >
-              <span>{group === 'All' ? 'All Exam Categories' : group}</span>
-              {countText && <span className={`text-[10px] font-semibold ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>{countText}</span>}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Dynamic Board Selector Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <button
-          onClick={() => setSelectedBoard('All')}
-          className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
-            selectedBoard === 'All'
-              ? 'bg-blue-600 border-blue-600 text-white shadow-md ring-2 ring-blue-500/20'
-              : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-slate-50/80'
-          }`}
-        >
-          <div>
-            <div className="flex items-center justify-between gap-1 mb-1">
-              <span className={`text-[10px] font-bold uppercase tracking-wider block ${
-                selectedBoard === 'All' ? 'text-blue-200' : 'text-slate-400'
+        {/* Categories Grid - Compact, fully visible names with no vertical waste */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5">
+          {/* Master Card: All Categories */}
+          <button
+            onClick={() => {
+              setSelectedBoard('All');
+              setSelectedExamTypePage(null);
+            }}
+            className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all duration-150 flex flex-col justify-between min-h-[64px] sm:min-h-[68px] cursor-pointer group hover:shadow-xs relative ${
+              selectedBoard === 'All' && !selectedExamTypePage
+                ? 'bg-blue-600 border-blue-600 text-white shadow-xs ring-2 ring-blue-400/40'
+                : 'bg-white border-slate-200 text-slate-800 hover:border-blue-400 hover:bg-slate-50/70'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-1.5 w-full">
+              <span className={`text-[9px] font-black uppercase tracking-wider ${
+                selectedBoard === 'All' && !selectedExamTypePage ? 'text-blue-100' : 'text-slate-400'
               }`}>
-                Complete
+                Master Bank
               </span>
-              <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded-full ${
-                selectedBoard === 'All' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700 border border-blue-100'
+              <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-full shrink-0 ${
+                selectedBoard === 'All' && !selectedExamTypePage 
+                  ? 'bg-white/20 text-white' 
+                  : 'bg-blue-50 text-blue-700 border border-blue-100'
               }`}>
-                {boardQuestionCounts['All'] || 0} Questions
+                {boardQuestionCounts['All'] || 0} Qs
               </span>
             </div>
-            <h3 className="font-bold text-sm md:text-base">All Boards ({selectedExamGroup})</h3>
-          </div>
-          <p className={`text-[11px] mt-2 line-clamp-2 ${
-            selectedBoard === 'All' ? 'text-blue-100' : 'text-slate-500'
-          }`}>
-            Complete library across all licensing authorities
-          </p>
-        </button>
 
-        {dynamicBoardCategories
-          .filter(catKey => {
-            if (selectedExamGroup === 'Entrance Exams') return (ENTRANCE_EXAMS as readonly string[]).includes(catKey);
-            if (selectedExamGroup === 'Nursing Exams') return (NURSING_EXAMS as readonly string[]).includes(catKey);
-            if (selectedExamGroup === 'Exit Exams') return (EXIT_EXAMS as readonly string[]).includes(catKey);
-            return true;
-          })
-          .map((catKey) => {
-          const count = boardQuestionCounts[catKey] || 0;
-          const isSelected = selectedBoard === catKey;
-          const prominent = getProminentExamMeta(catKey);
-
-          return (
-            <button
-              key={catKey}
-              onClick={() => {
-                setSelectedBoard(catKey);
-                setSelectedExamTypePage(catKey);
-              }}
-              className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                isSelected
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-md ring-2 ring-blue-500/20'
-                  : `${prominent.cardBg} ${prominent.cardBorder} text-slate-700 hover:shadow-xs`
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <span className={`text-[10px] font-extrabold uppercase tracking-wider block ${
-                    isSelected ? 'text-blue-200' : prominent.isProminent ? prominent.titleColor : 'text-slate-400'
-                  }`}>
-                    {prominent.isProminent ? prominent.accentBadge : 'Authority'}
-                  </span>
-                  <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded-full ${
-                    isSelected 
-                      ? 'bg-white/20 text-white' 
-                      : prominent.isProminent
-                        ? prominent.pillStyle
-                        : 'bg-blue-50 text-blue-700 border border-blue-100'
-                  }`}>
-                    {count} {count === 1 ? 'Q' : 'Qs'}
-                  </span>
-                </div>
-                <h3 className={`text-sm md:text-base font-black ${
-                  isSelected ? 'text-white' : prominent.titleColor
-                }`}>
-                  {catKey}
-                </h3>
-              </div>
-              <p className={`text-[11px] mt-1.5 line-clamp-2 ${
-                isSelected ? 'text-blue-100' : 'text-slate-500'
+            <div className="mt-1 flex items-center justify-between gap-1">
+              <h3 className={`text-xs sm:text-sm font-black tracking-tight leading-tight truncate ${
+                selectedBoard === 'All' && !selectedExamTypePage ? 'text-white' : 'text-slate-900'
               }`}>
-                {catKey} Specialty & Licensure Bank
-              </p>
-            </button>
-          );
-        })}
+                All Categories
+              </h3>
+              {selectedBoard === 'All' && !selectedExamTypePage && (
+                <CheckCircle className="w-3.5 h-3.5 text-white shrink-0" />
+              )}
+            </div>
+          </button>
+
+          {/* Dynamic Board Categories - 100% visible category names, tight & proportional */}
+          {dynamicBoardCategories
+            .filter(catKey => {
+              if (selectedExamGroup === 'Entrance Exams') return (ENTRANCE_EXAMS as readonly string[]).includes(catKey);
+              if (selectedExamGroup === 'Nursing Exams') return (NURSING_EXAMS as readonly string[]).includes(catKey);
+              if (selectedExamGroup === 'Exit Exams') return (EXIT_EXAMS as readonly string[]).includes(catKey);
+              return true;
+            })
+            .map((catKey) => {
+              const count = boardQuestionCounts[catKey] || 0;
+              const isSelected = selectedBoard === catKey;
+              const prominent = getProminentExamMeta(catKey);
+
+              return (
+                <button
+                  key={catKey}
+                  onClick={() => {
+                    if (selectedBoard === catKey) {
+                      setSelectedBoard('All');
+                    } else {
+                      setSelectedBoard(catKey);
+                    }
+                  }}
+                  className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all duration-150 flex flex-col justify-between min-h-[64px] sm:min-h-[68px] cursor-pointer group hover:shadow-xs relative ${
+                    isSelected
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-xs ring-2 ring-blue-400/40'
+                      : `${prominent.cardBg} ${prominent.cardBorder} text-slate-800 hover:border-blue-400`
+                  }`}
+                  title={`${catKey} - ${count} questions`}
+                >
+                  <div className="flex items-center justify-between gap-1.5 w-full">
+                    <span className={`text-[9px] font-black uppercase tracking-wider ${
+                      isSelected 
+                        ? 'text-blue-100' 
+                        : prominent.isProminent 
+                          ? prominent.titleColor 
+                          : 'text-slate-400'
+                    }`}>
+                      {prominent.isProminent ? prominent.accentBadge : 'Curriculum'}
+                    </span>
+                    <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-full shrink-0 ${
+                      isSelected
+                        ? 'bg-white/20 text-white'
+                        : prominent.isProminent
+                          ? prominent.pillStyle
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}>
+                      {count} Qs
+                    </span>
+                  </div>
+
+                  <div className="mt-1 flex items-center justify-between gap-1">
+                    <h3 className={`text-xs sm:text-sm font-black tracking-tight leading-tight break-words ${
+                      isSelected ? 'text-white' : prominent.titleColor
+                    }`}>
+                      {catKey}
+                    </h3>
+                    {isSelected && (
+                      <CheckCircle className="w-3.5 h-3.5 text-white shrink-0" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+        </div>
       </div>
 
-      {/* Controls & Filter Bar */}
-      <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
+      {/* Controls & Filter Bar - Compact */}
+      <div className="bg-white p-3 md:p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
         <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
           {/* Search Bar */}
           <div className="relative w-full lg:w-96">
