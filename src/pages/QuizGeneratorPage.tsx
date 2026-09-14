@@ -637,147 +637,105 @@ export default function QuizGeneratorPage({
   }
 
   return (
-    <div className={`max-w-5xl mx-auto ${embeddedModal ? 'p-0' : 'p-4 md:p-8 space-y-8'}`}>
+    <div className={`max-w-4xl mx-auto ${embeddedModal ? 'p-0' : 'space-y-4'}`}>
       {!isQuizActive ? (
         /* Configuration Screen */
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-10 space-y-8">
-          {/* Header */}
-          <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-200">
-                <BrainCircuit className="w-4 h-4 text-blue-600" />
-                Adaptive Clinical Practice Generator
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5 md:p-6 space-y-4">
+          {/* Compact Header */}
+          <div className="flex items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                <BrainCircuit className="w-5 h-5" />
               </div>
-              <h1 className="text-2xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
-                Configure Clinical Nursing Practice
-              </h1>
-              <p className="text-slate-500 text-sm md:text-base max-w-2xl">
-                Select your target nursing curriculum unit, question types, difficulty level, and mode to launch an instant practice test.
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-none">
+                    Configure Clinical Nursing Practice
+                  </h1>
+                  <span className="hidden sm:inline-flex px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-extrabold border border-blue-200 uppercase tracking-wide">
+                    Adaptive Generator
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Select your target curriculum, specialty unit, question formats, and feedback mode to launch your practice session.
+                </p>
+              </div>
             </div>
             {embeddedModal && onCloseModal && (
               <button 
                 onClick={onCloseModal} 
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             )}
           </div>
 
-          {/* Form Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Exam Board / Category Selection */}
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
-                Target Exam Category ({ALL_EXAM_TYPES.length} Types: Entrance, Nursing School & Exit Exams)
-              </label>
-              <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-200 max-h-36 overflow-y-auto">
-                <button
-                  type="button"
-                  onClick={() => setSelectedExamMode('All')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    selectedExamMode === 'All'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  All Exam Types
-                </button>
-                {ALL_EXAM_TYPES.map(examType => (
-                  <button
-                    key={examType}
-                    type="button"
-                    onClick={() => setSelectedExamMode(examType)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      selectedExamMode === examType
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    {examType}
-                  </button>
-                ))}
+          {/* Form Options Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+            {/* Target Exam Category */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                  Target Exam Category
+                </label>
+                <span className="text-[10px] font-bold text-blue-600">
+                  {selectedExamMode === 'All' ? '17 Exam Types' : selectedExamMode}
+                </span>
               </div>
+              <select
+                value={selectedExamMode}
+                onChange={(e) => setSelectedExamMode(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer transition-colors hover:bg-slate-100/80"
+              >
+                <option value="All">All Exam Types (Comprehensive Board Prep)</option>
+                {ALL_EXAM_TYPES.map(examType => (
+                  <option key={examType} value={examType}>{examType}</option>
+                ))}
+              </select>
             </div>
 
-            {/* Unit Specialty Selection */}
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
-                1. Select Nursing Unit / Specialty ({NURSING_UNITS.length} Units Available)
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setSelectedUnit('All')}
-                  className={`p-3 rounded-xl border text-left text-xs font-bold transition-all flex items-center justify-between ${
-                    selectedUnit === 'All'
-                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>All Curriculum Units</span>
-                  <BookOpen className="w-4 h-4 opacity-80" />
-                </button>
+            {/* Nursing Unit / Specialty */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                  Nursing Unit / Specialty
+                </label>
+                <span className="text-[10px] font-bold text-blue-600">
+                  {selectedUnit === 'All' ? '18 Units Available' : selectedUnit}
+                </span>
+              </div>
+              <select
+                value={selectedUnit}
+                onChange={(e) => setSelectedUnit(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer transition-colors hover:bg-slate-100/80"
+              >
+                <option value="All">All Curriculum Units (Comprehensive Practice)</option>
                 {NURSING_UNITS.map((unit) => {
                   const unitCount = ALL_QUIZ_QUESTIONS.filter(q => q.unitDomain === unit).length || 5;
                   return (
-                    <button
-                      key={unit}
-                      type="button"
-                      onClick={() => setSelectedUnit(unit)}
-                      className={`p-3 rounded-xl border text-left text-xs font-bold transition-all flex items-center justify-between ${
-                        selectedUnit === unit
-                          ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{unit}</span>
-                      <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
-                        selectedUnit === unit ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {unitCount} Qs
-                      </span>
-                    </button>
+                    <option key={unit} value={unit}>
+                      {unit} ({unitCount} Qs)
+                    </option>
                   );
                 })}
-              </div>
+              </select>
             </div>
 
-            {/* Question Count */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
-                2. Number of Questions
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {[5, 10, 15, 20].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setQuestionCount(num)}
-                    className={`p-3 rounded-xl border font-bold text-xs text-center transition-all ${
-                      questionCount === num
-                        ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    {num} Qs
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Question Type Filter */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
-                3. Question Format Type
+            {/* Question Format Type */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-blue-600" />
+                Question Format Type
               </label>
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer transition-colors hover:bg-slate-100/80"
               >
-                <option value="All">All Formats (MCQ, SATA, Math, Ordering, T/F)</option>
+                <option value="All">All Formats (MCQ, SATA, Math, Ordering, Case-based)</option>
                 <option value="single_choice">Multiple Choice (Single Answer)</option>
                 <option value="multiple_select">Select All That Apply (SATA)</option>
                 <option value="true_false">True or False</option>
@@ -799,65 +757,95 @@ export default function QuizGeneratorPage({
             </div>
 
             {/* Difficulty Level */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
-                4. Difficulty Level
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <Award className="w-3.5 h-3.5 text-blue-600" />
+                Difficulty Level
               </label>
               <select
                 value={selectedDifficulty}
                 onChange={(e) => setSelectedDifficulty(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer transition-colors hover:bg-slate-100/80"
               >
-                <option value="All">All Difficulty Levels</option>
+                <option value="All">All Difficulty Levels (Adaptive)</option>
                 <option value="Easy">Beginner / Easy</option>
-                <option value="Medium">Medium / Standard Board</option>
-                <option value="Hard">Advanced / Critical Judgment</option>
+                <option value="Medium">Medium / Standard Board Level</option>
+                <option value="Hard">Advanced / Critical Clinical Judgment</option>
               </select>
             </div>
 
-            {/* Practice Mode */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
-                5. Feedback Mode
+            {/* Number of Questions */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
+                Number of Questions
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-4 gap-1.5">
+                {[5, 10, 15, 20].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setQuestionCount(num)}
+                    className={`py-2 px-1 rounded-lg border font-bold text-xs text-center transition-all cursor-pointer ${
+                      questionCount === num
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-2xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {num} Qs
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Feedback & Mode */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
+                Feedback & Evaluation Mode
+              </label>
+              <div className="grid grid-cols-2 gap-1.5">
                 <button
                   type="button"
                   onClick={() => setQuizMode('study')}
-                  className={`p-3 rounded-xl border text-xs font-bold transition-all text-left ${
+                  className={`py-1.5 px-2.5 rounded-lg border text-xs font-bold transition-all text-left cursor-pointer flex items-center justify-between ${
                     quizMode === 'study'
-                      ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-2xs'
                       : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  <div className="font-extrabold">Study Mode</div>
-                  <div className="text-[10px] opacity-80">Instant Rationales</div>
+                  <div>
+                    <div className="font-bold leading-none">Study Mode</div>
+                    <div className="text-[10px] opacity-80 mt-0.5 leading-none">Instant Rationales</div>
+                  </div>
+                  {quizMode === 'study' && <Check className="w-3.5 h-3.5 shrink-0 ml-1" />}
                 </button>
                 <button
                   type="button"
                   onClick={() => setQuizMode('exam')}
-                  className={`p-3 rounded-xl border text-xs font-bold transition-all text-left ${
+                  className={`py-1.5 px-2.5 rounded-lg border text-xs font-bold transition-all text-left cursor-pointer flex items-center justify-between ${
                     quizMode === 'exam'
-                      ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-2xs'
                       : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  <div className="font-extrabold">Exam Mode</div>
-                  <div className="text-[10px] opacity-80">Score at the End</div>
+                  <div>
+                    <div className="font-bold leading-none">Exam Mode</div>
+                    <div className="text-[10px] opacity-80 mt-0.5 leading-none">Score at the End</div>
+                  </div>
+                  {quizMode === 'exam' && <Check className="w-3.5 h-3.5 shrink-0 ml-1" />}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Launch Button */}
-          <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Compact Launch Footer */}
+          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="text-xs text-slate-500 flex items-center gap-1.5">
-              <CheckCircle className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>Includes board questions with rationales and dosage math.</span>
+              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>Session: <strong className="text-slate-800">{questionCount} Questions</strong> • <strong className="text-slate-800">{selectedUnit === 'All' ? 'All Units' : selectedUnit}</strong> • <span className="capitalize">{quizMode}</span></span>
             </div>
             <Button
               onClick={handleStartQuiz}
-              className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl gap-2 shadow-lg shadow-blue-500/20"
+              className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl gap-2 shadow-md shadow-blue-500/20 cursor-pointer"
             >
               <Play className="w-4 h-4 fill-white" /> Launch Practice Quiz
             </Button>
