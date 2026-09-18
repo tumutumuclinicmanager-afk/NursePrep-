@@ -23,6 +23,7 @@ export interface EditableQuestion {
 export interface ExamEditorData {
   id: string;
   title: string;
+  examCode?: string;
   category: string;
   domain: string;
   description?: string;
@@ -95,6 +96,7 @@ export function ExamEditorModal({ isOpen, onClose, exam, onSave }: ExamEditorMod
   
   // Blueprint Fields
   const [title, setTitle] = useState('');
+  const [examCode, setExamCode] = useState('');
   const [category, setCategory] = useState(POPULAR_EXAM_MODES[0]);
   const [customCategory, setCustomCategory] = useState('');
   const [domain, setDomain] = useState(POPULAR_DOMAINS[0]);
@@ -135,6 +137,7 @@ export function ExamEditorModal({ isOpen, onClose, exam, onSave }: ExamEditorMod
     if (!isOpen || !exam) return;
 
     setTitle(exam.title || '');
+    setExamCode(exam.examCode || '');
     
     // Category check
     if (POPULAR_EXAM_MODES.includes(exam.category)) {
@@ -541,6 +544,7 @@ export function ExamEditorModal({ isOpen, onClose, exam, onSave }: ExamEditorMod
       ...exam,
       id: exam.id,
       title: title.trim(),
+      examCode: examCode.trim(),
       category: finalCategory,
       domain: finalDomain,
       description: description.trim(),
@@ -566,6 +570,7 @@ export function ExamEditorModal({ isOpen, onClose, exam, onSave }: ExamEditorMod
       // 1. Save directly to Firestore 'exams' collection
       await setDoc(doc(db, 'exams', exam.id), {
         title: updatedExamPayload.title,
+        examCode: updatedExamPayload.examCode,
         category: updatedExamPayload.category,
         domain: updatedExamPayload.domain,
         description: updatedExamPayload.description,
@@ -750,15 +755,27 @@ export function ExamEditorModal({ isOpen, onClose, exam, onSave }: ExamEditorMod
                   <FileText className="w-4 h-4 text-blue-600" /> Exam Identification
                 </h3>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Exam Title *</label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g., NCLEX-RN Comprehensive Clinical Mastery 2026"
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="sm:col-span-3 space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Exam Title *</label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="e.g., NCLEX-RN Comprehensive Clinical Mastery 2026"
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-1 space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Exam Code</label>
+                    <input
+                      type="text"
+                      value={examCode}
+                      onChange={(e) => setExamCode(e.target.value)}
+                      placeholder="e.g. NR56"
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white uppercase"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1193,6 +1210,19 @@ export function ExamEditorModal({ isOpen, onClose, exam, onSave }: ExamEditorMod
                           <option value="multiple_select">Multiple Select / SATA (Select All That Apply)</option>
                           <option value="true_false">True / False</option>
                           <option value="numeric">Numeric / Dosage Calculation</option>
+                          <option value="order_drag">Prioritization / Sequencing (Drag & Drop)</option>
+                          <option value="order_numbers">Ordering (Numbers 1, 2, 3...)</option>
+                          <option value="matrix_grid">Matrix / Tabular Grid (NextGen NCLEX)</option>
+                          <option value="case_exhibit">Case Study Exhibit (Multi-tab)</option>
+                          <option value="sieve_bowtie">Sieve / Bowtie Analysis</option>
+                          <option value="image_based">Image Based (Diagram / ECG)</option>
+                          <option value="multiple_image">Multiple Image Choice</option>
+                          <option value="matching">Matching Pairs</option>
+                          <option value="short_answer">Short Answer</option>
+                          <option value="fill_blank">Fill in the Blank</option>
+                          <option value="hotspot">Hotspot / Region Click</option>
+                          <option value="essay">Essay / Rubric Evaluation</option>
+                          <option value="file_upload">File Upload Artifact</option>
                         </select>
                       </div>
 

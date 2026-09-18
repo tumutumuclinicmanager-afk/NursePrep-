@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { 
@@ -549,6 +549,7 @@ export default function ExamBank() {
   const [selectedPlanFilter, setSelectedPlanFilter] = useState<'All' | 'My Plan Access' | 'free' | 'basic' | 'gold' | 'platinum'>('All');
   const [requiredPlanModalExam, setRequiredPlanModalExam] = useState<ExamItem | null>(null);
   const [practiceLimitInfo, setPracticeLimitInfo] = useState<{ limit: number; total: number } | null>(null);
+  const examsSectionRef = useRef<HTMLDivElement>(null);
 
   // Sync with searchParams from URL (e.g., from Dashboard categories snapshot)
   useEffect(() => {
@@ -2484,6 +2485,7 @@ export default function ExamBank() {
             onClick={() => {
               setSelectedBoard('All');
               setSelectedExamTypePage(null);
+              examsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
             }}
             className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all duration-150 flex flex-col justify-between min-h-[64px] sm:min-h-[68px] cursor-pointer group hover:shadow-xs relative ${
               selectedBoard === 'All' && !selectedExamTypePage
@@ -2540,6 +2542,7 @@ export default function ExamBank() {
                     } else {
                       setSelectedBoard(catKey);
                     }
+                    examsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
                   }}
                   className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all duration-150 flex flex-col justify-between min-h-[64px] sm:min-h-[68px] cursor-pointer group hover:shadow-xs relative ${
                     isSelected
@@ -2586,7 +2589,7 @@ export default function ExamBank() {
       </div>
 
       {/* Controls & Filter Bar - Compact */}
-      <div className="bg-white p-3 md:p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+      <div ref={examsSectionRef} className="bg-white p-3 md:p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
         <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
           {/* Search Bar */}
           <div className="relative w-full lg:w-96">
