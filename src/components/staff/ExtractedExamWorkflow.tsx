@@ -103,6 +103,7 @@ export default function ExtractedExamWorkflow({
 
   // Global Exam Metadata
   const [examTitle, setExamTitle] = useState(initialTitle || '');
+  const [examCode, setExamCode] = useState('');
   const [selectedExamMode, setSelectedExamMode] = useState(initialExamMode || 'NCLEX-RN');
   const [selectedDomain, setSelectedDomain] = useState('Medical-Surgical Nursing');
   const [examDifficulty, setExamDifficulty] = useState<'Beginner' | 'Medium' | 'Advanced'>('Medium');
@@ -429,6 +430,7 @@ export default function ExtractedExamWorkflow({
       // 2. Prepare and save Exam document in Firestore
       const examDocPayload = JSON.parse(JSON.stringify({
         title: examTitle.trim(),
+        examCode: examCode.trim(),
         category: selectedExamMode,
         domain: selectedDomain,
         difficulty: examDifficulty,
@@ -730,16 +732,30 @@ export default function ExtractedExamWorkflow({
             </div>
 
             {/* Exam Metadata Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-semibold">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs font-semibold">
+              <div className="sm:col-span-2">
                 <label className="block text-slate-700 mb-1 font-bold">Exam Title</label>
-                <input 
-                  type="text" 
-                  value={examTitle}
-                  onChange={(e) => setExamTitle(e.target.value)}
-                  placeholder="e.g. NCLEX-RN Pharmacology Comprehensive Mock"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-800 font-medium outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="col-span-3">
+                    <input 
+                      type="text" 
+                      value={examTitle}
+                      onChange={(e) => setExamTitle(e.target.value)}
+                      placeholder="e.g. Pharmacology Comprehensive Mock"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-800 font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <input 
+                      type="text" 
+                      value={examCode}
+                      onChange={(e) => setExamCode(e.target.value)}
+                      placeholder="Code"
+                      className="w-full px-2 py-2 border border-slate-200 rounded-xl text-slate-800 font-semibold uppercase outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                      title="Exam Code e.g. NR56"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>

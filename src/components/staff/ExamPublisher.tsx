@@ -13,6 +13,7 @@ import { ExamEditorModal } from '@/components/admin/ExamEditorModal';
 export interface ExamDoc {
   id?: string;
   title: string;
+  examCode?: string;
   category: string;
   domain: string;
   description?: string;
@@ -78,6 +79,7 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
 
   // Form State
   const [title, setTitle] = useState('');
+  const [examCode, setExamCode] = useState('');
   const [category, setCategory] = useState(DEFAULT_EXAM_TYPES[0]);
   const [customCategory, setCustomCategory] = useState('');
   const [domain, setDomain] = useState(DEFAULT_DOMAINS[0]);
@@ -254,6 +256,7 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
   const handleOpenCreateModal = () => {
     setEditingExamId(null);
     setTitle('');
+    setExamCode('');
     setCategory(DEFAULT_EXAM_TYPES[0]);
     setCustomCategory('');
     setDomain(DEFAULT_DOMAINS[0]);
@@ -272,6 +275,7 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
   const handleOpenEditModal = (exam: ExamDoc) => {
     setEditingExamId(exam.id || null);
     setTitle(exam.title || '');
+    setExamCode(exam.examCode || '');
     
     if (DEFAULT_EXAM_TYPES.includes(exam.category) || customExamModes.some(m => m.name === exam.category)) {
       setCategory(exam.category);
@@ -336,6 +340,7 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
 
     const payload: Omit<ExamDoc, 'id'> = {
       title: title.trim(),
+      examCode: examCode.trim(),
       category: finalCategory,
       domain,
       description: description.trim(),
@@ -683,17 +688,29 @@ export default function ExamPublisher({ onExamUpdated }: { onExamUpdated?: () =>
             </div>
 
             <form onSubmit={handleSaveExam} className="space-y-4">
-              {/* Exam Title */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Exam Title *</label>
-                <input 
-                  type="text" 
-                  value={title} 
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. ATI TEAS 7 Science Mastery Mock Exam 2026"
-                  required
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none"
-                />
+              {/* Exam Title & Exam Code */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="sm:col-span-3 space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Exam Title *</label>
+                  <input 
+                    type="text" 
+                    value={title} 
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. ATI TEAS 7 Science Mastery Mock Exam 2026"
+                    required
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div className="sm:col-span-1 space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Exam Code</label>
+                  <input 
+                    type="text" 
+                    value={examCode} 
+                    onChange={(e) => setExamCode(e.target.value)}
+                    placeholder="e.g. NR56"
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm font-semibold uppercase focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
               </div>
 
               {/* Category & Custom Category Input */}
