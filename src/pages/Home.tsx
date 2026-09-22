@@ -1,33 +1,69 @@
 import React from 'react';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { BookOpen, Target, Brain, Award, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/Card';
+import { BookOpen, Target, Brain, Award, ArrowRight, CheckCircle2, ShieldCheck, LogIn, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import DarkVeil from '@/components/DarkVeil';
 
 export default function Home() {
   return (
-    <div className="flex flex-col">
-      {/* Hero Section */}
-      <section className="px-6 py-16 md:py-24 lg:py-32 bg-gradient-to-br from-primary-900 to-primary-700 text-white overflow-hidden relative">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1576091160550-2173ff9e5ee5?q=80&w=2069&auto=format&fit=crop')] mix-blend-overlay opacity-10 bg-cover bg-center"></div>
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
-            Master Your Nursing Exams with Expert Preparation
-          </h1>
-          <p className="text-lg md:text-xl text-primary-100 mb-10 max-w-2xl mx-auto">
-            Comprehensive study materials, intelligent quiz generation, and realistic mock exams for <strong>NCLEX</strong>, <strong>ATI TEAS</strong>, and <strong>HESI</strong>, and more.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/register">
-              <Button size="lg" className="w-full sm:w-auto bg-accent-orange-500 hover:bg-accent-orange-600 text-white border-none">
-                Start Learning for Free
-              </Button>
-            </Link>
-            <Link to="/exams">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto text-white border-white/30 hover:bg-white/10">
-                Explore Exam Bank
-              </Button>
-            </Link>
+    <div className="flex flex-col min-h-screen">
+      {/* Full-Screen Atmospheric Hero Section with DarkVeil Background */}
+      <section className="relative w-full h-[calc(100vh-64px)] min-h-[640px] max-h-[960px] bg-slate-950 text-white overflow-hidden flex items-center justify-center">
+        {/* Full-screen DarkVeil canvas background */}
+        <div className="absolute inset-0 w-full h-full z-0">
+          <DarkVeil 
+            speed={0.45} 
+            hueShift={215} 
+            noiseIntensity={0.025} 
+            warpAmount={0.22} 
+            resolutionScale={1} 
+          />
+        </div>
+
+        {/* Ambient Dark Gradients & Vignette for maximum text readability */}
+        <div className="absolute inset-0 bg-radial from-transparent via-slate-950/40 to-slate-950/80 pointer-events-none z-10"></div>
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-slate-950 to-transparent pointer-events-none z-10"></div>
+
+        {/* Layered Content centered in front with absolute positioning and high z-index */}
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center px-6 text-center pointer-events-auto">
+          <div className="max-w-4xl mx-auto space-y-6 flex flex-col items-center">
+            {/* Main Headline */}
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1] text-white drop-shadow-xl">
+              Master Your Nursing Future
+            </h1>
+
+            {/* Subheadline */}
+            <p className="text-base sm:text-lg md:text-xl text-slate-200 max-w-2xl mx-auto font-normal leading-relaxed drop-shadow">
+              Comprehensive study materials, intelligent quiz generation, and realistic mock exams for <strong>NCLEX-RN/PN</strong>, <strong>ATI TEAS</strong>, <strong>HESI A2</strong>, and more.
+            </p>
+
+            {/* Centered Call-to-Action Buttons (Login / Register) */}
+            <div className="flex flex-col sm:flex-row items-center gap-4 justify-center pt-3 w-full max-w-md">
+              <Link to="/register" className="w-full sm:w-1/2">
+                <Button size="lg" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-600/30 border-none transition-all flex items-center justify-center gap-2 h-12 text-base">
+                  <UserPlus className="w-4 h-4" /> Register
+                </Button>
+              </Link>
+              <Link to="/login" className="w-full sm:w-1/2">
+                <Button size="lg" variant="outline" className="w-full text-white border-white/30 hover:bg-white/15 bg-slate-900/60 backdrop-blur-md font-semibold flex items-center justify-center gap-2 h-12 text-base">
+                  <LogIn className="w-4 h-4" /> Login
+                </Button>
+              </Link>
+            </div>
+
+            {/* Feature Trust Badges */}
+            <div className="pt-6 flex flex-wrap items-center justify-center gap-6 text-xs sm:text-sm text-slate-300">
+              <span className="flex items-center gap-1.5 backdrop-blur-xs px-3 py-1 rounded-md bg-slate-900/40 border border-white/10">
+                <ShieldCheck className="w-4 h-4 text-blue-400" /> Verified Rationales
+              </span>
+              <span className="flex items-center gap-1.5 backdrop-blur-xs px-3 py-1 rounded-md bg-slate-900/40 border border-white/10">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" /> NGN Bowtie & Case Studies
+              </span>
+              <span className="flex items-center gap-1.5 backdrop-blur-xs px-3 py-1 rounded-md bg-slate-900/40 border border-white/10">
+                <ShieldCheck className="w-4 h-4 text-amber-400" /> AI Adaptive Feedback
+              </span>
+            </div>
           </div>
         </div>
       </section>
