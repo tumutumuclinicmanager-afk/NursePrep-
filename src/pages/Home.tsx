@@ -1,11 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { BookOpen, Target, Brain, Award, ArrowRight, CheckCircle2, ShieldCheck, LogIn, UserPlus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { BookOpen, Target, Brain, Award, ArrowRight, CheckCircle2, ShieldCheck, LogIn, UserPlus, Lock, Sparkles } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import DarkVeil from '@/components/DarkVeil';
+import TestimonialCarousel from '@/components/TestimonialCarousel';
 
 export default function Home() {
+  const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(!!auth.currentUser || !!localStorage.getItem('userRole'));
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const role = localStorage.getItem('userRole');
+      setIsLoggedIn(!!user || !!role);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleExamClick = (examName: string) => {
+    if (isLoggedIn) {
+      navigate(`/dashboard/exams?search=${encodeURIComponent(examName)}`);
+    } else {
+      navigate('/login?redirect=/dashboard/exams', {
+        state: { from: '/dashboard/exams', message: `Please sign in to access ${examName} practice questions and mock exams.` }
+      });
+    }
+  };
+
+  const handleViewAllClick = () => {
+    if (isLoggedIn) {
+      navigate('/dashboard/exams');
+    } else {
+      navigate('/login?redirect=/dashboard/exams', {
+        state: { from: '/dashboard/exams', message: 'Please sign in to access the full nursing exam question bank.' }
+      });
+    }
+  };
   return (
     <div className="flex flex-col min-h-screen">
       {/* Full-Screen Atmospheric Hero Section with DarkVeil Background */}
@@ -38,18 +72,58 @@ export default function Home() {
               Comprehensive study materials, intelligent quiz generation, and realistic mock exams for <strong>NCLEX-RN/PN</strong>, <strong>ATI TEAS</strong>, <strong>HESI A2</strong>, and more.
             </p>
 
-            {/* Centered Call-to-Action Buttons (Login / Register) */}
+            {/* Centered Call-to-Action Buttons with Framer-Motion Pulse Animation */}
             <div className="flex flex-col sm:flex-row items-center gap-4 justify-center pt-3 w-full max-w-md">
-              <Link to="/register" className="w-full sm:w-1/2">
-                <Button size="lg" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-600/30 border-none transition-all flex items-center justify-center gap-2 h-12 text-base">
-                  <UserPlus className="w-4 h-4" /> Register
-                </Button>
-              </Link>
-              <Link to="/login" className="w-full sm:w-1/2">
-                <Button size="lg" variant="outline" className="w-full text-white border-white/30 hover:bg-white/15 bg-slate-900/60 backdrop-blur-md font-semibold flex items-center justify-center gap-2 h-12 text-base">
-                  <LogIn className="w-4 h-4" /> Login
-                </Button>
-              </Link>
+              <motion.div
+                className="w-full sm:w-1/2"
+                animate={{
+                  scale: [1, 1.025, 1],
+                  boxShadow: [
+                    '0 10px 25px -5px rgba(37, 99, 235, 0.3)',
+                    '0 15px 35px -5px rgba(37, 99, 235, 0.55)',
+                    '0 10px 25px -5px rgba(37, 99, 235, 0.3)'
+                  ]
+                }}
+                transition={{
+                  duration: 2.8,
+                  repeat: Infinity,
+                  ease: 'easeInOut'
+                }}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Link to="/register" className="w-full block">
+                  <Button size="lg" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xl shadow-blue-600/30 border-none transition-all flex items-center justify-center gap-2 h-12 text-base">
+                    <UserPlus className="w-4 h-4" /> Register
+                  </Button>
+                </Link>
+              </motion.div>
+
+              <motion.div
+                className="w-full sm:w-1/2"
+                animate={{
+                  scale: [1, 1.015, 1],
+                  boxShadow: [
+                    '0 4px 12px rgba(255, 255, 255, 0.05)',
+                    '0 6px 18px rgba(255, 255, 255, 0.12)',
+                    '0 4px 12px rgba(255, 255, 255, 0.05)'
+                  ]
+                }}
+                transition={{
+                  duration: 2.8,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: 0.4
+                }}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Link to="/login" className="w-full block">
+                  <Button size="lg" variant="outline" className="w-full text-white border-white/30 hover:bg-white/15 bg-slate-900/60 backdrop-blur-md font-semibold flex items-center justify-center gap-2 h-12 text-base">
+                    <LogIn className="w-4 h-4" /> Login
+                  </Button>
+                </Link>
+              </motion.div>
             </div>
 
             {/* Feature Trust Badges */}
@@ -71,14 +145,37 @@ export default function Home() {
       {/* Featured Exams Section */}
       <section className="py-16 px-6 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-end justify-between mb-10">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
             <div>
-              <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Popular Exams</h2>
-              <p className="text-slate-500">Trusted by thousands of nursing students globally.</p>
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-3xl font-bold tracking-tight text-slate-900">Popular Exams</h2>
+                {!isLoggedIn && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                    <Lock className="w-3 h-3" /> Login Required
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-500">
+                {isLoggedIn 
+                  ? 'Select an exam category to start practicing immediately.' 
+                  : 'Sign in to access over 40,000+ verified NCLEX and nursing questions.'}
+              </p>
             </div>
-            <Link to="/exams" className="hidden sm:flex items-center text-primary-600 font-medium hover:text-primary-700">
-              View all <ArrowRight className="w-4 h-4 ml-1" />
-            </Link>
+            <button 
+              onClick={handleViewAllClick} 
+              className="inline-flex items-center text-blue-600 font-semibold hover:text-blue-700 cursor-pointer transition-colors self-start sm:self-auto group"
+            >
+              {isLoggedIn ? (
+                <>
+                  View all exams <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4 mr-1 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                  Sign in to view all <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                </>
+              )}
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -90,18 +187,38 @@ export default function Home() {
               { name: 'NCK', count: '3,000+ Questions', color: 'bg-rose-100 text-rose-700' },
               { name: 'ATI TEAS', count: '4,500+ Questions', color: 'bg-amber-100 text-amber-700' }
             ].map((exam) => (
-              <Card key={exam.name} className="hover:shadow-md transition-shadow cursor-pointer group border-slate-200">
+              <Card 
+                key={exam.name} 
+                onClick={() => handleExamClick(exam.name)}
+                className="hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer group border-slate-200 relative overflow-hidden"
+              >
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div className={`px-3 py-1 rounded-full text-xs font-semibold ${exam.color}`}>
                       Featured
                     </div>
-                    <BookOpen className="w-5 h-5 text-slate-400 group-hover:text-primary-500 transition-colors" />
+                    {isLoggedIn ? (
+                      <BookOpen className="w-5 h-5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                    ) : (
+                      <div className="flex items-center gap-1 text-slate-400 group-hover:text-blue-600 transition-colors">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                    )}
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">{exam.name}</h3>
+                  <h3 className="text-xl font-bold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors">{exam.name}</h3>
                   <p className="text-slate-500 text-sm mb-4">{exam.count}</p>
-                  <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary-500 w-1/3"></div>
+                  
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs font-semibold">
+                    {isLoggedIn ? (
+                      <span className="text-blue-600 flex items-center gap-1 group-hover:underline">
+                        Start Practice <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 flex items-center gap-1 group-hover:text-blue-600">
+                        <Lock className="w-3.5 h-3.5" /> Sign in to Practice
+                      </span>
+                    )}
+                    <span className="text-slate-400 font-normal">NextGen Ready</span>
                   </div>
                 </CardContent>
               </Card>
@@ -146,6 +263,9 @@ export default function Home() {
            </div>
         </div>
       </section>
+
+      {/* Testimonial Carousel Section */}
+      <TestimonialCarousel />
 
       {/* Pricing CTA */}
       <section className="py-20 px-6 bg-white border-t border-slate-200">

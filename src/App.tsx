@@ -96,7 +96,7 @@ function PublicOrDashboardExams() {
   if (userRole === 'admin') {
     return <Navigate to="/admin" replace />;
   }
-  return <ExamBank />;
+  return <Navigate to="/login?redirect=/dashboard/exams" replace state={{ from: '/dashboard/exams', message: 'Please log in to access the exam bank.' }} />;
 }
 
 export default function App() {

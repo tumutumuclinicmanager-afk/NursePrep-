@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Chrome, Clock, AlertCircle, Eye, EyeOff, ArrowLeft, Mail, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { Chrome, Clock, AlertCircle, Eye, EyeOff, ArrowLeft, Mail, CheckCircle2, RefreshCw, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { auth, db, googleProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -8,8 +8,11 @@ import NurseLoadingAnimation from '@/components/NurseLoadingAnimation';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const isTimeout = searchParams.get('reason') === 'timeout';
+  const redirectTarget = searchParams.get('redirect') || (location.state as any)?.from;
+  const stateMessage = (location.state as any)?.message;
   const [error, setError] = useState('');
 
   const [email, setEmail] = useState('');
@@ -118,7 +121,8 @@ export default function Login() {
       } else if (userRole === 'staff') {
         navigate('/staff');
       } else {
-        navigate('/dashboard');
+        const dest = redirectTarget && redirectTarget.startsWith('/') ? redirectTarget : '/dashboard';
+        navigate(dest);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
@@ -163,7 +167,8 @@ export default function Login() {
       } else if (userRole === 'staff') {
         navigate('/staff');
       } else {
-        navigate('/dashboard');
+        const dest = redirectTarget && redirectTarget.startsWith('/') ? redirectTarget : '/dashboard';
+        navigate(dest);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to sign in with Google');
@@ -227,6 +232,17 @@ export default function Login() {
               <div>
                 <strong className="font-bold block">Session Expired</strong>
                 <span>Your session expired due to inactivity. Please sign in again.</span>
+              </div>
+            </div>
+          )}
+
+          {/* Exam Bank Protected Access Banner */}
+          {!isTimeout && redirectTarget?.includes('exams') && !error && !isForgotPassword && (
+            <div className="mb-3.5 p-2.5 bg-blue-50 text-blue-900 border border-blue-200 rounded-xl text-xs flex items-start gap-2 shadow-2xs">
+              <Lock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-bold block">Exam Bank Login Required</strong>
+                <span>{stateMessage || 'Please sign in to access the NCLEX & nursing exam banks.'}</span>
               </div>
             </div>
           )}
