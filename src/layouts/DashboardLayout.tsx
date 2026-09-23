@@ -188,6 +188,12 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
                 </div>
                 <p className="font-extrabold text-sm mt-1 text-slate-100">Full Repository Access</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">Active Premium Member</p>
+                <button
+                  onClick={() => navigate('/pricing')}
+                  className="mt-3 w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Upgrade Plan
+                </button>
               </div>
             ) : trial.isExpired ? (
               <div className="p-3.5 bg-gradient-to-b from-rose-950 to-slate-950 rounded-xl text-white shadow-lg border border-rose-700/80">
