@@ -52,7 +52,7 @@ export function FloatingWhatsApp() {
     <aside
       id="floating-whatsapp-banner"
       aria-label="WhatsApp Contact Banner"
-      className="fixed top-[70px] sm:top-[72px] right-3 sm:right-6 md:right-8 z-30 max-w-[calc(100vw-1.5rem)] transition-all duration-300 animate-in fade-in slide-in-from-top-2"
+      className="fixed top-[70px] sm:top-[72px] right-3 sm:right-6 md:right-8 z-30 max-w-[calc(100vw-1.5rem)] transition-all duration-300 animate-in fade-in slide-in-from-top-2 slide-in-from-right-4"
     >
       <div className="relative group bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-xl shadow-slate-900/15 border border-emerald-500/40 p-2 sm:p-2.5 flex items-center gap-2.5 sm:gap-3 hover:border-emerald-400 transition-all">
         {/* Clickable WhatsApp link trigger */}

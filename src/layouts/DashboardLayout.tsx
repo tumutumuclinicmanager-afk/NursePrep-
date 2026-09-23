@@ -190,9 +190,9 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
                 <p className="text-[11px] text-slate-400 mt-0.5">Active Premium Member</p>
                 <button
                   onClick={() => navigate('/pricing')}
-                  className="mt-3 w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="mt-3 w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm transition-all flex items-center justify-center cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Upgrade Plan
+                  Upgrade Plan
                 </button>
               </div>
             ) : trial.isExpired ? (
@@ -213,9 +213,9 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
                 </p>
                 <button 
                   onClick={() => navigate('/pricing')}
-                  className="mt-2.5 w-full py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-black uppercase tracking-wider shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                  className="mt-2.5 w-full py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-black uppercase tracking-wider shadow-sm transition-colors flex items-center justify-center cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Upgrade Account
+                  Upgrade Account
                 </button>
                 <button
                   onClick={async () => {
@@ -254,9 +254,9 @@ export function DashboardLayout({ userRole = 'student' }: { userRole?: 'student'
                 </div>
                 <button 
                   onClick={() => navigate('/pricing')}
-                  className="mt-3 w-full py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg text-xs font-black uppercase tracking-wider shadow-xs transition-colors flex items-center justify-center gap-1"
+                  className="mt-3 w-full py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg text-xs font-black uppercase tracking-wider shadow-xs transition-colors flex items-center justify-center cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5" /> Upgrade Plan
+                  Upgrade Plan
                 </button>
                 <button
                   onClick={async () => {
