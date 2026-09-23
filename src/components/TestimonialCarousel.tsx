@@ -45,15 +45,15 @@ const TESTIMONIALS: Testimonial[] = [
   },
   {
     id: '3',
-    name: 'Brian Kipkorir, RN',
-    role: 'Cardiac Stepdown Specialist',
-    schoolOrHospital: 'Moi University & MTRH Eldoret',
-    examPassed: 'NCK Licensure & NCLEX-RN',
-    scoreOrResult: 'Top 5% NCK / 85 Questions NCLEX',
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=200',
+    name: 'David Okafor, APRN, FNP-C',
+    role: 'Family Nurse Practitioner',
+    schoolOrHospital: 'Ohio State Medical Center',
+    examPassed: 'NCLEX-RN & ANCC FNP',
+    scoreOrResult: '100% First-Time Pass Rate Mentee Cohort',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
     rating: 5,
-    text: 'The rationale breakdowns for Select All That Apply (SATA) and Bowtie questions are unmatched. Being able to take quick 10-question mobile quizzes during breaks helped me score in the top tier and pass my international licensure smoothly.',
-    highlight: 'Top 5% score & passed NCLEX in 85 questions',
+    text: 'I recommend Nurse Prep to all my nursing students and mentees. The quality of rationales, instant diagnostic analytics, and true-to-exam NextGen difficulty make it the single most reliable preparation platform available.',
+    highlight: 'Highest recommendation for clinical licensure',
     date: '1 month ago'
   },
   {
@@ -71,19 +71,6 @@ const TESTIMONIALS: Testimonial[] = [
   },
   {
     id: '5',
-    name: 'David Okafor, APRN, FNP-C',
-    role: 'Family Nurse Practitioner',
-    schoolOrHospital: 'Ohio State Medical Center',
-    examPassed: 'NCLEX-RN & ANCC FNP',
-    scoreOrResult: '100% First-Time Pass Rate Mentee Cohort',
-    avatar: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=200',
-    rating: 5,
-    text: 'I recommend Nurse Prep to all my nursing students and mentees. The quality of rationales, instant diagnostic analytics, and true-to-exam NextGen difficulty make it the single most reliable preparation platform available.',
-    highlight: 'Highest recommendation for clinical licensure',
-    date: '2 months ago'
-  },
-  {
-    id: '6',
     name: 'Emily Miller, BSN',
     role: 'Pediatric Oncology Nurse',
     schoolOrHospital: 'Johns Hopkins School of Nursing',
